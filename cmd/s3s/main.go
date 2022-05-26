@@ -21,7 +21,7 @@ var (
 
 func init() {
 	// AWS
-	flag.StringVar(&region, "region", "", "region")
+	flag.StringVar(&region, "region", os.Getenv("AWS_REGION"), "region")
 
 	// S3 Select Query
 	flag.StringVar(&query, "query", "SELECT * FROM S3Object s", "query")
@@ -42,7 +42,7 @@ func cmd() int {
 	}
 
 	ctx := context.TODO()
-	app, err := s3s.NewApp(ctx)
+	app, err := s3s.NewApp(ctx, region)
 	if err != nil {
 		log.Println("[ERROR]", err)
 		return 1

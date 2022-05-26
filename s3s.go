@@ -11,8 +11,8 @@ type App struct {
 	s3client *s3.Client
 }
 
-func NewApp(ctx context.Context) (*App, error) {
-	cfg, err := config.LoadDefaultConfig(ctx)
+func NewApp(ctx context.Context, region string) (*App, error) {
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
 		return nil, err
 	}
