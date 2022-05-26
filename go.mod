@@ -1,4 +1,4 @@
-module github.com/koluku/s3select
+module github.com/koluku/s3s
 
 go 1.17
 

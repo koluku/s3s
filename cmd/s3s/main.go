@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	s3s "github.com/koluku/s3select"
+	"github.com/koluku/s3s"
 )
 
 var (
