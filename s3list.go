@@ -12,17 +12,14 @@ func GetS3Keys(ctx context.Context, app *App, bucket string, prefix string) ([]s
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
 	}
-	paginator := s3.NewListObjectsV2Paginator(app.s3client, input)
+	output, err := app.s3client.ListObjectsV2(ctx, input)
+	if err != nil {
+		return nil, err
+	}
 
-	s3keys := []string{}
-	for paginator.HasMorePages() {
-		output, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, content := range output.Contents {
-			s3keys = append(s3keys, *content.Key)
-		}
+	var s3keys = make([]string, len(output.Contents))
+	for i, content := range output.Contents {
+		s3keys[i] = *content.Key
 	}
 
 	return s3keys, nil
