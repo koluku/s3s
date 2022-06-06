@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	"flag"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"strings"
 
 	"github.com/koluku/s3s"
+	"github.com/urfave/cli/v2"
 )
 
 var (
@@ -19,33 +20,20 @@ var (
 	query string
 )
 
-func init() {
-	// AWS
-	flag.StringVar(&region, "region", os.Getenv("AWS_REGION"), "region")
-
-	// S3 Select Query
-	flag.StringVar(&query, "query", "SELECT * FROM S3Object s", "query")
-}
-
 type bucketKeys struct {
 	bucket string
 	keys   []string
 }
 
-func cmd() int {
-	flag.Parse()
-	paths := flag.Args()
-
+func cmd(paths []string) error {
 	if len(paths) == 0 {
-		log.Println("[ERROR]", "no arguments")
-		return 1
+		return fmt.Errorf("no argument error")
 	}
 
 	ctx := context.TODO()
 	app, err := s3s.NewApp(ctx, region)
 	if err != nil {
-		log.Println("[ERROR]", err)
-		return 1
+		return err
 	}
 
 	// Get S3 Object Keys
@@ -53,8 +41,7 @@ func cmd() int {
 	for _, path := range paths {
 		u, err := url.Parse(path)
 		if err != nil {
-			log.Println("[ERROR]", err)
-			return 1
+			return err
 		}
 		var bucket, prefix string
 		bucket = u.Hostname()
@@ -62,8 +49,7 @@ func cmd() int {
 		prefix = strings.TrimSuffix(prefix, "/")
 		s3Keys, err := s3s.GetS3Keys(ctx, app, bucket, prefix)
 		if err != nil {
-			log.Println("[ERROR]", err)
-			return 1
+			return err
 		}
 		targetBucketKeys = append(targetBucketKeys, bucketKeys{bucket: bucket, keys: s3Keys})
 	}
@@ -71,15 +57,39 @@ func cmd() int {
 	for _, bk := range targetBucketKeys {
 		for _, key := range bk.keys {
 			if err := s3s.S3Select(ctx, app, bk.bucket, key, query); err != nil {
-				log.Println("[ERROR]", err)
-				return 1
+				return err
 			}
 		}
 	}
 
-	return 0
+	return nil
 }
 
 func main() {
-	os.Exit(cmd())
+	app := &cli.App{
+		Name:  "s3s",
+		Usage: "Easy S3 Select like searching directory",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "region",
+				Usage:       "region",
+				Destination: &region,
+			},
+			&cli.StringFlag{
+				Name:        "query",
+				Aliases:     []string{"q"},
+				Usage:       "query",
+				Value:       "SELECT * FROM S3Object s",
+				Destination: &query,
+			},
+		},
+		Action: func(c *cli.Context) error {
+			return cmd(c.Args().Slice())
+		},
+	}
+
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
