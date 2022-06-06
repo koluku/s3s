@@ -14,10 +14,11 @@ import (
 
 var (
 	// AWS
-	region string
+	region string = os.Getenv("AWS_REGION")
 
 	// S3 Select Query
 	query string
+	where string
 )
 
 type bucketKeys struct {
@@ -28,6 +29,10 @@ type bucketKeys struct {
 func cmd(paths []string) error {
 	if len(paths) == 0 {
 		return fmt.Errorf("no argument error")
+	}
+
+	if where != "" {
+		query = fmt.Sprintf("SELECT * FROM S3Object s WHERE %s", where)
 	}
 
 	ctx := context.TODO()
@@ -81,6 +86,12 @@ func main() {
 				Usage:       "query",
 				Value:       "SELECT * FROM S3Object s",
 				Destination: &query,
+			},
+			&cli.StringFlag{
+				Name:        "where",
+				Aliases:     []string{"w"},
+				Usage:       "where",
+				Destination: &where,
 			},
 		},
 		Action: func(c *cli.Context) error {
