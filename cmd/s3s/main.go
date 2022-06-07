@@ -13,6 +13,9 @@ import (
 )
 
 var (
+	// goreleaser
+	Version = "current"
+
 	// AWS
 	region string = os.Getenv("AWS_REGION")
 
