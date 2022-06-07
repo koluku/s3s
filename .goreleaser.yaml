@@ -26,3 +26,10 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+brews:
+  - tap:
+      owner: koluku
+      name: homebrew-s3s
+    folder: Formula
+    homepage: 'https://github.com/koluku/s3s'
+    description: 'Easy S3 Select like searching directory'
