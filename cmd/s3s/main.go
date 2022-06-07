@@ -12,6 +12,9 @@ import (
 )
 
 var (
+	// goreleaser
+	Version = "current"
+
 	// AWS
 	region string
 
