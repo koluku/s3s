@@ -3,6 +3,7 @@ package s3s
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -47,6 +48,8 @@ func GetS3Keys(ctx context.Context, app *App, bucket string, prefix string) ([]s
 }
 
 func S3Select(ctx context.Context, app *App, bucket string, key string, query string) error {
+	compressionType := suggestCompressionType(key)
+
 	params := &s3.SelectObjectContentInput{
 		Bucket:          aws.String(bucket),
 		Key:             aws.String(key),
@@ -54,7 +57,7 @@ func S3Select(ctx context.Context, app *App, bucket string, key string, query st
 		Expression:      aws.String(query),
 		RequestProgress: &types.RequestProgress{},
 		InputSerialization: &types.InputSerialization{
-			CompressionType: types.CompressionTypeGzip,
+			CompressionType: compressionType,
 			JSON: &types.JSONInput{
 				Type: types.JSONTypeLines,
 			},
@@ -84,4 +87,15 @@ func S3Select(ctx context.Context, app *App, bucket string, key string, query st
 	}
 
 	return nil
+}
+
+func suggestCompressionType(key string) types.CompressionType {
+	switch {
+	case strings.HasSuffix(key, ".gz"):
+		return types.CompressionTypeGzip
+	case strings.HasSuffix(key, ".bz2"):
+		return types.CompressionTypeBzip2
+	default:
+		return types.CompressionTypeNone
+	}
 }
