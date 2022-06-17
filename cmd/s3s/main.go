@@ -75,25 +75,26 @@ func cmd(paths []string) error {
 
 func main() {
 	app := &cli.App{
-		Name:  "s3s",
-		Usage: "Easy S3 Select like searching directory",
+		Name:    "s3s",
+		Version: Version,
+		Usage:   "Easy S3 Select like searching directory",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "region",
-				Usage:       "region",
+				Usage:       "region of target s3 bucket exist",
 				Destination: &region,
 			},
 			&cli.StringFlag{
 				Name:        "query",
 				Aliases:     []string{"q"},
-				Usage:       "query",
+				Usage:       "SQL query for s3 select",
 				Value:       "SELECT * FROM S3Object s",
 				Destination: &query,
 			},
 			&cli.StringFlag{
 				Name:        "where",
 				Aliases:     []string{"w"},
-				Usage:       "where",
+				Usage:       "WHERE part of the SQL query",
 				Destination: &where,
 			},
 		},
