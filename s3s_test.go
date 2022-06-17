@@ -55,17 +55,17 @@ func TestSuggestCompressionType(t *testing.T) {
 		want types.CompressionType
 	}{
 		{
-			name: "sss",
+			name: "GZIP",
 			key:  "all-logs/2022/06/16/1626.gz",
 			want: types.CompressionTypeGzip,
 		},
 		{
-			name: "aaa",
+			name: "BZIP2",
 			key:  "all-logs/2022/06/16/1626.bz2",
 			want: types.CompressionTypeBzip2,
 		},
 		{
-			name: "cc",
+			name: "JSON as None",
 			key:  "all-logs/2022/06/16/1626.json",
 			want: types.CompressionTypeNone,
 		},
