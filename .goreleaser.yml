@@ -26,6 +26,8 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+prerelease: auto
+
 brews:
   - tap:
       owner: koluku
