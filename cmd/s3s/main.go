@@ -24,6 +24,44 @@ var (
 	where string
 )
 
+func main() {
+	app := &cli.App{
+		Name:    "s3s",
+		Version: Version,
+		Usage:   "Easy S3 Select like searching directory",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "region",
+				Usage:       "region of target s3 bucket exist",
+				Value:       os.Getenv("AWS_REGION"),
+				DefaultText: "AWS_REGION",
+				Destination: &region,
+			},
+			&cli.StringFlag{
+				Name:        "query",
+				Aliases:     []string{"q"},
+				Usage:       "SQL query for s3 select",
+				Value:       "SELECT * FROM S3Object s",
+				Destination: &query,
+			},
+			&cli.StringFlag{
+				Name:        "where",
+				Aliases:     []string{"w"},
+				Usage:       "WHERE part of the SQL query",
+				Destination: &where,
+			},
+		},
+		Action: func(c *cli.Context) error {
+			return cmd(c.Args().Slice())
+		},
+	}
+
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 type bucketKeys struct {
 	bucket string
 	keys   []string
@@ -71,42 +109,4 @@ func cmd(paths []string) error {
 	}
 
 	return nil
-}
-
-func main() {
-	app := &cli.App{
-		Name:    "s3s",
-		Version: Version,
-		Usage:   "Easy S3 Select like searching directory",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "region",
-				Usage:       "region of target s3 bucket exist",
-				Value:       os.Getenv("AWS_REGION"),
-				DefaultText: "AWS_REGION",
-				Destination: &region,
-			},
-			&cli.StringFlag{
-				Name:        "query",
-				Aliases:     []string{"q"},
-				Usage:       "SQL query for s3 select",
-				Value:       "SELECT * FROM S3Object s",
-				Destination: &query,
-			},
-			&cli.StringFlag{
-				Name:        "where",
-				Aliases:     []string{"w"},
-				Usage:       "WHERE part of the SQL query",
-				Destination: &where,
-			},
-		},
-		Action: func(c *cli.Context) error {
-			return cmd(c.Args().Slice())
-		},
-	}
-
-	err := app.Run(os.Args)
-	if err != nil {
-		log.Fatal(err)
-	}
 }
