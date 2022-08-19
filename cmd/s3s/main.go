@@ -17,7 +17,7 @@ var (
 	Version = "current"
 
 	// AWS
-	region string = os.Getenv("AWS_REGION")
+	region string
 
 	// S3 Select Query
 	query string
@@ -82,6 +82,8 @@ func main() {
 			&cli.StringFlag{
 				Name:        "region",
 				Usage:       "region of target s3 bucket exist",
+				Value:       os.Getenv("AWS_REGION"),
+				DefaultText: "AWS_REGION",
 				Destination: &region,
 			},
 			&cli.StringFlag{
