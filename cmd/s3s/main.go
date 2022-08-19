@@ -105,7 +105,7 @@ func getBucketKeys(ctx context.Context, app *s3s.App, paths []string) ([]bucketK
 
 	var eg errgroup.Group
 	for _, path := range paths {
-		path = path
+		path := path
 		eg.Go(func() error {
 			u, err := url.Parse(path)
 			if err != nil {
