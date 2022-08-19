@@ -10,6 +10,7 @@ import (
 
 	"github.com/koluku/s3s"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -76,28 +77,15 @@ func cmd(paths []string) error {
 		query = fmt.Sprintf("SELECT * FROM S3Object s WHERE %s", where)
 	}
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	app, err := s3s.NewApp(ctx, region)
 	if err != nil {
 		return err
 	}
 
-	// Get S3 Object Keys
-	targetBucketKeys := []bucketKeys{}
-	for _, path := range paths {
-		u, err := url.Parse(path)
-		if err != nil {
-			return err
-		}
-		var bucket, prefix string
-		bucket = u.Hostname()
-		prefix = strings.TrimPrefix(u.Path, "/")
-		prefix = strings.TrimSuffix(prefix, "/")
-		s3Keys, err := s3s.GetS3Keys(ctx, app, bucket, prefix)
-		if err != nil {
-			return err
-		}
-		targetBucketKeys = append(targetBucketKeys, bucketKeys{bucket: bucket, keys: s3Keys})
+	targetBucketKeys, err := getBucketKeys(ctx, app, paths)
+	if err != nil {
+		return err
 	}
 
 	for _, bk := range targetBucketKeys {
@@ -109,4 +97,36 @@ func cmd(paths []string) error {
 	}
 
 	return nil
+}
+
+// Get S3 Object Keys
+func getBucketKeys(ctx context.Context, app *s3s.App, paths []string) ([]bucketKeys, error) {
+	targetBucketKeys := []bucketKeys{}
+
+	var eg errgroup.Group
+	for _, path := range paths {
+		path = path
+		eg.Go(func() error {
+			u, err := url.Parse(path)
+			if err != nil {
+				return err
+			}
+			var bucket, prefix string
+			bucket = u.Hostname()
+			prefix = strings.TrimPrefix(u.Path, "/")
+			prefix = strings.TrimSuffix(prefix, "/")
+			s3Keys, err := s3s.GetS3Keys(ctx, app, bucket, prefix)
+			if err != nil {
+				return err
+			}
+			targetBucketKeys = append(targetBucketKeys, bucketKeys{bucket: bucket, keys: s3Keys})
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
+	return targetBucketKeys, nil
 }
