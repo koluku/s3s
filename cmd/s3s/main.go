@@ -88,12 +88,8 @@ func cmd(paths []string) error {
 		return err
 	}
 
-	for _, bk := range targetBucketKeys {
-		for _, key := range bk.keys {
-			if err := s3s.S3Select(ctx, app, bk.bucket, key, query); err != nil {
-				return err
-			}
-		}
+	if err := execS3Select(ctx, app, targetBucketKeys); err != nil {
+		return err
 	}
 
 	return nil
@@ -129,4 +125,25 @@ func getBucketKeys(ctx context.Context, app *s3s.App, paths []string) ([]bucketK
 	}
 
 	return targetBucketKeys, nil
+}
+
+func execS3Select(ctx context.Context, app *s3s.App, targetBucketKeys []bucketKeys) error {
+	var eg errgroup.Group
+	for _, bk := range targetBucketKeys {
+		for _, key := range bk.keys {
+			key := key
+			eg.Go(func() error {
+				if err := s3s.S3Select(ctx, app, bk.bucket, key, query); err != nil {
+					return err
+				}
+				return nil
+			})
+		}
+	}
+
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	return nil
 }
