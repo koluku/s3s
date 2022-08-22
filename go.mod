@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.14.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.25.0
 	github.com/urfave/cli/v2 v2.8.1
+	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 )
 
 require (
