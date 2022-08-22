@@ -26,8 +26,6 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
-prerelease: auto
-
 brews:
   - tap:
       owner: koluku
@@ -35,4 +33,4 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     folder: Formula
     homepage: 'https://github.com/koluku/s3s'
-    description: 'Easy S3 Select like searching directory'
+    description: 'Easy S3 select like searching in directories'
