@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	DEFAULT_QUERY        = "SELECT * FROM S3Object s"
 	DEFAULT_THREAD_COUNT = 150
 )
 
@@ -40,26 +41,26 @@ func main() {
 	app := &cli.App{
 		Name:    "s3s",
 		Version: Version,
-		Usage:   "Easy S3 Select like searching directory",
+		Usage:   "Easy S3 select like searching in directories",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "region",
 				Usage:       "region of target s3 bucket exist",
 				Value:       os.Getenv("AWS_REGION"),
-				DefaultText: "AWS_REGION",
+				DefaultText: "ENV[\"AWS_REGION\"]",
 				Destination: &region,
 			},
 			&cli.StringFlag{
 				Name:        "query",
 				Aliases:     []string{"q"},
-				Usage:       "SQL query for s3 select",
-				Value:       "SELECT * FROM S3Object s",
+				Usage:       "a query for S3 Select",
+				Value:       DEFAULT_QUERY,
 				Destination: &query,
 			},
 			&cli.StringFlag{
 				Name:        "where",
 				Aliases:     []string{"w"},
-				Usage:       "WHERE part of the SQL query",
+				Usage:       "WHERE part of the query",
 				Destination: &where,
 			},
 			&cli.IntFlag{
