@@ -6,11 +6,16 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
 
 	"github.com/koluku/s3s"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	DEFAULT_THREAD_COUNT = 150
 )
 
 var (
@@ -23,9 +28,15 @@ var (
 	// S3 Select Query
 	query string
 	where string
+
+	// command option
+	threadCount int
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	app := &cli.App{
 		Name:    "s3s",
 		Version: Version,
@@ -51,13 +62,20 @@ func main() {
 				Usage:       "WHERE part of the SQL query",
 				Destination: &where,
 			},
+			&cli.IntFlag{
+				Name:        "thread_count",
+				Aliases:     []string{"t"},
+				Usage:       "max number of api requests to concurrently",
+				Value:       DEFAULT_THREAD_COUNT,
+				Destination: &threadCount,
+			},
 		},
 		Action: func(c *cli.Context) error {
-			return cmd(c.Args().Slice())
+			return cmd(c.Context, c.Args().Slice())
 		},
 	}
 
-	err := app.Run(os.Args)
+	err := app.RunContext(ctx, os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,7 +86,7 @@ type bucketKeys struct {
 	keys   []string
 }
 
-func cmd(paths []string) error {
+func cmd(ctx context.Context, paths []string) error {
 	if len(paths) == 0 {
 		return fmt.Errorf("no argument error")
 	}
@@ -77,14 +95,13 @@ func cmd(paths []string) error {
 		query = fmt.Sprintf("SELECT * FROM S3Object s WHERE %s", where)
 	}
 
-	ctx := context.Background()
 	app, err := s3s.NewApp(ctx, region)
 	if err != nil {
 		return err
 	}
 
-	targetBucketKeys, err := getBucketKeys(ctx, app, paths)
-	if err != nil {
+	targetBucketKeys := make(chan bucketKeys, len(paths))
+	if err := getBucketKeys(ctx, app, paths, targetBucketKeys); err != nil {
 		return err
 	}
 
@@ -96,10 +113,9 @@ func cmd(paths []string) error {
 }
 
 // Get S3 Object Keys
-func getBucketKeys(ctx context.Context, app *s3s.App, paths []string) ([]bucketKeys, error) {
-	targetBucketKeys := []bucketKeys{}
-
-	var eg errgroup.Group
+func getBucketKeys(ctx context.Context, app *s3s.App, paths []string, targetBucketKeys chan bucketKeys) error {
+	eg, egctx := errgroup.WithContext(ctx)
+	eg.SetLimit(threadCount)
 	for _, path := range paths {
 		path := path
 		eg.Go(func() error {
@@ -111,29 +127,35 @@ func getBucketKeys(ctx context.Context, app *s3s.App, paths []string) ([]bucketK
 			bucket = u.Hostname()
 			prefix = strings.TrimPrefix(u.Path, "/")
 			prefix = strings.TrimSuffix(prefix, "/")
-			s3Keys, err := s3s.GetS3Keys(ctx, app, bucket, prefix)
+
+			s3Keys, err := s3s.GetS3Keys(egctx, app, bucket, prefix)
 			if err != nil {
 				return err
 			}
-			targetBucketKeys = append(targetBucketKeys, bucketKeys{bucket: bucket, keys: s3Keys})
+			targetBucketKeys <- bucketKeys{bucket: bucket, keys: s3Keys}
+
 			return nil
 		})
 	}
 
-	if err := eg.Wait(); err != nil {
-		return nil, err
+	err := eg.Wait()
+	close(targetBucketKeys)
+	if err != nil {
+		return err
 	}
 
-	return targetBucketKeys, nil
+	return nil
 }
 
-func execS3Select(ctx context.Context, app *s3s.App, targetBucketKeys []bucketKeys) error {
-	var eg errgroup.Group
-	for _, bk := range targetBucketKeys {
+func execS3Select(ctx context.Context, app *s3s.App, targetBucketKeys chan bucketKeys) error {
+	eg, egctx := errgroup.WithContext(ctx)
+	eg.SetLimit(threadCount)
+	for bk := range targetBucketKeys {
+		bucket := bk.bucket
 		for _, key := range bk.keys {
 			key := key
 			eg.Go(func() error {
-				if err := s3s.S3Select(ctx, app, bk.bucket, key, query); err != nil {
+				if err := s3s.S3Select(egctx, app, bucket, key, query); err != nil {
 					return err
 				}
 				return nil
