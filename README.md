@@ -8,25 +8,26 @@ S3S is a go binary instead of [vast-engineering/s3select](https://github.com/vas
 ## Usage
 
 ```console
-$ ./s3s help
+$ ./s3s --help
 NAME:
-   s3s - Easy S3 Select like searching directory
+   s3s - Easy S3 select like searching in directories
 
 USAGE:
    s3s [global options] command [command options] [arguments...]
 
 VERSION:
-   0.0.0
+   v0.1.0
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --help, -h               show help (default: false)
-   --query value, -q value  SQL query for s3 select (default: "SELECT * FROM S3Object s")
-   --region value           region of target s3 bucket exist
-   --version, -v            print the version (default: false)
-   --where value, -w value  WHERE part of the SQL query
+   --help, -h                      show help (default: false)
+   --query value, -q value         a query for S3 Select (default: "SELECT * FROM S3Object s")
+   --region value                  region of target s3 bucket exist (default: ENV["AWS_REGION"])
+   --thread_count value, -t value  max number of api requests to concurrently (default: 150)
+   --version, -v                   print the version (default: false)
+   --where value, -w value         WHERE part of the query
 ```
 
 ```console
