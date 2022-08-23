@@ -205,7 +205,6 @@ func delvePrefix(ctx context.Context, app *s3s.App, bucket string, prefix string
 	case 1:
 		return fmt.Sprintf("s3://%s/%s", bucket, prefix), nil
 	default:
-		fmt.Println(s3Dirs[index])
 		return delvePrefix(ctx, app, bucket, s3Dirs[index])
 	}
 }
