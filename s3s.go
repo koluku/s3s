@@ -12,6 +12,7 @@ import (
 )
 
 type S3API interface {
+	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 	SelectObjectContent(ctx context.Context, params *s3.SelectObjectContentInput, optFns ...func(*s3.Options)) (*s3.SelectObjectContentOutput, error)
 }
@@ -27,6 +28,40 @@ func NewApp(ctx context.Context, region string) (*App, error) {
 
 	s3Client := s3.NewFromConfig(cfg)
 	return &App{s3client: s3Client}, nil
+}
+
+func GetS3Bucket(ctx context.Context, app *App) ([]string, error) {
+	input := &s3.ListBucketsInput{}
+	output, err := app.s3client.ListBuckets(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	var s3keys = make([]string, len(output.Buckets))
+	for i, content := range output.Buckets {
+		s3keys[i] = *content.Name
+	}
+
+	return s3keys, nil
+}
+
+func GetS3Dir(ctx context.Context, app *App, bucket string, prefix string) ([]string, error) {
+	input := &s3.ListObjectsV2Input{
+		Bucket:    aws.String(bucket),
+		Prefix:    aws.String(prefix),
+		Delimiter: aws.String("/"),
+	}
+	output, err := app.s3client.ListObjectsV2(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	var s3keys = make([]string, len(output.CommonPrefixes))
+	for i, content := range output.CommonPrefixes {
+		s3keys[i] = *content.Prefix
+	}
+
+	return s3keys, nil
 }
 
 func GetS3Keys(ctx context.Context, app *App, bucket string, prefix string) ([]string, error) {
