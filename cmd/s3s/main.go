@@ -161,6 +161,12 @@ func cmd(ctx context.Context, paths []string) error {
 		return err
 	}
 
+	if isDelve {
+		for _, path := range paths {
+			fmt.Fprintln(os.Stderr, path)
+		}
+	}
+
 	return nil
 }
 
