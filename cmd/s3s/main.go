@@ -174,21 +174,24 @@ func delvePrefix(ctx context.Context, app *s3s.App, bucket string, prefix string
 		return "", err
 	}
 
-	current := prefix
-	parent := "../"
+	current := "Query↵"
+	parent := "←Back upper path"
 	if prefix == "" {
-		current = "/"
 		s3Dirs = append([]string{current}, s3Dirs...)
 	} else {
-		s3Dirs = append([]string{parent, current}, s3Dirs...)
+		s3Dirs = append([]string{current, parent}, s3Dirs...)
 	}
 	index, err := fuzzyfinder.Find(
 		s3Dirs,
 		func(i int) string {
-			if i == 0 {
+			switch i {
+			case 0:
 				return parent
+			case 1:
+				return current + " (" + fmt.Sprintf("s3://%s/%s", bucket, prefix) + ")"
+			default:
+				return bucket + "/" + s3Dirs[i]
 			}
-			return bucket + "/" + s3Dirs[i]
 		},
 	)
 	if err != nil {
