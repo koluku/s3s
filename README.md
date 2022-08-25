@@ -16,7 +16,7 @@ USAGE:
    s3s [global options] command [command options] [arguments...]
 
 VERSION:
-   v0.1.0
+   v0.2.0
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
@@ -79,5 +79,5 @@ Querying after Enter.
 
 ...
 
-bucket/prefix/A/ (print path as stderr at end)
+bucket/prefix/A/ (print path to stderr at end)
 ```
