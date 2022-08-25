@@ -22,6 +22,7 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
+   --delve                         like directory move before querying (default: false)
    --help, -h                      show help (default: false)
    --query value, -q value         a query for S3 Select (default: "SELECT * FROM S3Object s")
    --region value                  region of target s3 bucket exist (default: ENV["AWS_REGION"])
@@ -46,3 +47,37 @@ $ s3s -q 'SELECT * FROM S3Object s WHERE s.type = "speak"' s3://bucket/prefix
 // $ s3s -w 's.type = "speak"' s3://bucket/prefix
 ```
 
+### `-delve`, like directory move before querying
+
+search from prefix
+
+```console
+$ s3s -delve s3://bucket/prefix
+```
+
+search from bucket list
+
+```console
+$ s3s -delve
+```
+
+```
+  bucket/prefix/C/
+  bucket/prefix/B/
+  bucket/prefix/A/        # delve more lower path than this prefix
+  Query↵ (s3://bucket/prefix/) # choose and execute s3select this prefix
+> ←Back upper path        # back to parent prefix
+5/5
+>
+```
+
+Querying after Enter.
+
+```
+{"time":1654848930,"type":"speak"}
+{"time":1654848969,"type":"sleep"}
+
+...
+
+bucket/prefix/A/ (print path as stderr at end)
+```

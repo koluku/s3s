@@ -75,6 +75,7 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:        "delve",
+				Usage:       "like directory move before querying",
 				Value:       false,
 				Destination: &isDelve,
 			},
