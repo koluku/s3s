@@ -7,11 +7,9 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path"
 	"strings"
 
 	"github.com/koluku/s3s"
-	"github.com/ktr0731/go-fuzzyfinder"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -118,39 +116,11 @@ func cmd(ctx context.Context, paths []string) error {
 	}
 
 	if isDelve {
-		if len(paths) == 0 {
-			buckets, err := getBucketList(ctx, app)
-			if err != nil {
-				return err
-			}
-
-			idx, err := fuzzyfinder.Find(
-				buckets,
-				func(i int) string {
-					return buckets[i]
-				},
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-			paths = []string{"s3://" + buckets[idx]}
-		}
-
-		u, err := url.Parse(paths[0])
+		newPaths, err := pathDelver(ctx, app, paths)
 		if err != nil {
 			return err
 		}
-
-		var bucket, prefix string
-		bucket = u.Hostname()
-		prefix = strings.TrimPrefix(u.Path, "/")
-
-		path, err := delvePrefix(ctx, app, bucket, prefix)
-		if err != nil {
-			return err
-		}
-
-		paths = []string{path}
+		paths = newPaths
 	}
 
 	targetBucketKeys := make(chan bucketKeys, len(paths))
@@ -169,54 +139,6 @@ func cmd(ctx context.Context, paths []string) error {
 	}
 
 	return nil
-}
-
-func getBucketList(ctx context.Context, app *s3s.App) ([]string, error) {
-	return s3s.GetS3Bucket(ctx, app)
-}
-
-func delvePrefix(ctx context.Context, app *s3s.App, bucket string, prefix string) (string, error) {
-	s3Dirs, err := s3s.GetS3Dir(ctx, app, bucket, prefix)
-	if err != nil {
-		return "", err
-	}
-
-	current := "Query↵"
-	parent := "←Back upper path"
-	if prefix == "" {
-		s3Dirs = append([]string{current}, s3Dirs...)
-	} else {
-		s3Dirs = append([]string{current, parent}, s3Dirs...)
-	}
-	index, err := fuzzyfinder.Find(
-		s3Dirs,
-		func(i int) string {
-			switch i {
-			case 0:
-				return parent
-			case 1:
-				return current + " (" + fmt.Sprintf("s3://%s/%s", bucket, prefix) + ")"
-			default:
-				return bucket + "/" + s3Dirs[i]
-			}
-		},
-	)
-	if err != nil {
-		return "", err
-	}
-
-	switch index {
-	case 0:
-		parent = path.Join(prefix, "../")
-		if parent == "." {
-			return delvePrefix(ctx, app, bucket, "")
-		}
-		return delvePrefix(ctx, app, bucket, parent+"/")
-	case 1:
-		return fmt.Sprintf("s3://%s/%s", bucket, prefix), nil
-	default:
-		return delvePrefix(ctx, app, bucket, s3Dirs[index])
-	}
 }
 
 // Get S3 Object Keys
