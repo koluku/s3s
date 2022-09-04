@@ -29,6 +29,7 @@ var (
 	// S3 Select Query
 	query string
 	where string
+	limit int
 
 	// command option
 	threadCount int
@@ -55,7 +56,6 @@ func main() {
 				Name:        "query",
 				Aliases:     []string{"q"},
 				Usage:       "a query for S3 Select",
-				Value:       DEFAULT_QUERY,
 				Destination: &query,
 			},
 			&cli.StringFlag{
@@ -63,6 +63,12 @@ func main() {
 				Aliases:     []string{"w"},
 				Usage:       "WHERE part of the query",
 				Destination: &where,
+			},
+			&cli.IntFlag{
+				Name:        "limit",
+				Aliases:     []string{"l"},
+				Usage:       "max number of results from each key to return",
+				Destination: &limit,
 			},
 			&cli.IntFlag{
 				Name:        "thread_count",
@@ -96,19 +102,14 @@ type bucketKeys struct {
 
 func cmd(ctx context.Context, paths []string) error {
 	// Arguments Check
-	if isDelve {
-		if len(paths) > 1 {
-			return fmt.Errorf("too many argument error")
-		}
-	} else {
-		if len(paths) == 0 {
-			return fmt.Errorf("no argument error")
-		}
+	if err := checkArgs(ctx, paths); err != nil {
+		return err
 	}
-
-	if where != "" {
-		query = fmt.Sprintf("SELECT * FROM S3Object s WHERE %s", where)
+	builtQuery, err := checkQuery(ctx, query, where, limit)
+	if err != nil {
+		return err
 	}
+	query = builtQuery
 
 	app, err := s3s.NewApp(ctx, region)
 	if err != nil {
