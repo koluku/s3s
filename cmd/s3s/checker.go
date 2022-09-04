@@ -21,7 +21,6 @@ func checkArgs(ctx context.Context, paths []string) error {
 }
 
 func checkQuery(ctx context.Context, query string, where string, limit int) (string, error) {
-	// Query Check
 	if query == "" {
 		query = DEFAULT_QUERY
 		if where != "" {
