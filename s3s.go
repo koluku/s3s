@@ -11,13 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-type S3API interface {
-	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
-	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
-	SelectObjectContent(ctx context.Context, params *s3.SelectObjectContentInput, optFns ...func(*s3.Options)) (*s3.SelectObjectContentOutput, error)
-}
 type App struct {
-	s3client S3API
+	s3client *s3.Client
 }
 
 func NewApp(ctx context.Context, region string) (*App, error) {
@@ -51,17 +46,24 @@ func GetS3Dir(ctx context.Context, app *App, bucket string, prefix string) ([]st
 		Prefix:    aws.String(prefix),
 		Delimiter: aws.String("/"),
 	}
-	output, err := app.s3client.ListObjectsV2(ctx, input)
-	if err != nil {
-		return nil, err
+	pagenator := s3.NewListObjectsV2Paginator(app.s3client, input)
+
+	var s3Keys []string
+	for pagenator.HasMorePages() {
+		output, err := pagenator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		pageKeys := make([]string, len(output.CommonPrefixes))
+		for i := range output.CommonPrefixes {
+			pageKeys[i] = *output.CommonPrefixes[i].Prefix
+		}
+
+		s3Keys = append(s3Keys, pageKeys...)
 	}
 
-	var s3keys = make([]string, len(output.CommonPrefixes))
-	for i, content := range output.CommonPrefixes {
-		s3keys[i] = *content.Prefix
-	}
-
-	return s3keys, nil
+	return s3Keys, nil
 }
 
 func GetS3Keys(ctx context.Context, app *App, bucket string, prefix string) ([]string, error) {
@@ -69,17 +71,24 @@ func GetS3Keys(ctx context.Context, app *App, bucket string, prefix string) ([]s
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
 	}
-	output, err := app.s3client.ListObjectsV2(ctx, input)
-	if err != nil {
-		return nil, err
+	pagenator := s3.NewListObjectsV2Paginator(app.s3client, input)
+
+	var s3Keys []string
+	for pagenator.HasMorePages() {
+		output, err := pagenator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		pageKeys := make([]string, output.KeyCount)
+		for i := range output.Contents {
+			pageKeys[i] = *output.Contents[i].Key
+		}
+
+		s3Keys = append(s3Keys, pageKeys...)
 	}
 
-	var s3keys = make([]string, len(output.Contents))
-	for i, content := range output.Contents {
-		s3keys[i] = *content.Key
-	}
-
-	return s3keys, nil
+	return s3Keys, nil
 }
 
 func S3Select(ctx context.Context, app *App, bucket string, key string, query string) error {
