@@ -93,7 +93,10 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			return cmd(c.Context, c.Args().Slice())
+			if err := cmd(c.Context, c.Args().Slice()); err != nil {
+				return err
+			}
+			return nil
 		},
 	}
 
@@ -133,10 +136,16 @@ func cmd(ctx context.Context, paths []string) error {
 	ch := make(chan s3s.Path, DEFAULT_POOL_SIZE)
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return getBucketKeys(egctx, app, ch, paths)
+		if err := getBucketKeys(egctx, app, ch, paths); err != nil {
+			return err
+		}
+		return nil
 	})
 	eg.Go(func() error {
-		return execS3Select(egctx, app, ch)
+		if err := execS3Select(egctx, app, ch); err != nil {
+			return err
+		}
+		return nil
 	})
 	if err := eg.Wait(); err != nil {
 		return err
@@ -168,7 +177,10 @@ func getBucketKeys(ctx context.Context, app *s3s.App, ch chan<- s3s.Path, paths 
 			prefix = strings.TrimPrefix(u.Path, "/")
 			prefix = strings.TrimSuffix(prefix, "/")
 
-			return s3s.GetS3KeysWithChannel(egctx, app, ch, bucket, prefix)
+			if s3s.GetS3KeysWithChannel(egctx, app, ch, bucket, prefix); err != nil {
+				return err
+			}
+			return nil
 		})
 	}
 

@@ -20,7 +20,10 @@ func execS3Select(ctx context.Context, app *s3s.App, ch chan s3s.Path) error {
 		return nil
 	})
 	eg.Go(func() error {
-		return writeResult(egctx, resultReciever)
+		if err := writeResult(egctx, resultReciever); err != nil {
+			return err
+		}
+		return nil
 	})
 
 	if err := eg.Wait(); err != nil {
