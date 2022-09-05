@@ -2,6 +2,7 @@ package s3s
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -91,6 +92,35 @@ func GetS3Keys(ctx context.Context, app *App, bucket string, prefix string) ([]s
 	return s3Keys, nil
 }
 
+type Path struct {
+	Bucket string
+	Key    string
+}
+
+func GetS3KeysWithChannel(ctx context.Context, app *App, sender chan<- Path, bucket string, prefix string) error {
+	input := &s3.ListObjectsV2Input{
+		Bucket: aws.String(bucket),
+		Prefix: aws.String(prefix),
+	}
+	pagenator := s3.NewListObjectsV2Paginator(app.s3client, input)
+
+	for pagenator.HasMorePages() {
+		output, err := pagenator.NextPage(ctx)
+		if err != nil {
+			return err
+		}
+
+		for i := range output.Contents {
+			sender <- Path{
+				Bucket: bucket,
+				Key:    *output.Contents[i].Key,
+			}
+		}
+	}
+
+	return nil
+}
+
 func S3Select(ctx context.Context, app *App, bucket string, key string, query string) error {
 	compressionType := suggestCompressionType(key)
 
@@ -123,6 +153,59 @@ func S3Select(ctx context.Context, app *App, bucket string, key string, query st
 		if ok {
 			value := string(v.Value.Payload)
 			fmt.Print(value)
+		}
+	}
+
+	if err := stream.Err(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type S3SelectResult struct {
+	Value string `json:"-"`
+	Count int    `json:"_1"`
+}
+
+func S3SelectWithChannel(ctx context.Context, app *App, bucket string, key string, query string, isCount bool, sender chan<- S3SelectResult) error {
+	compressionType := suggestCompressionType(key)
+
+	params := &s3.SelectObjectContentInput{
+		Bucket:          aws.String(bucket),
+		Key:             aws.String(key),
+		ExpressionType:  types.ExpressionTypeSql,
+		Expression:      aws.String(query),
+		RequestProgress: &types.RequestProgress{},
+		InputSerialization: &types.InputSerialization{
+			CompressionType: compressionType,
+			JSON: &types.JSONInput{
+				Type: types.JSONTypeLines,
+			},
+		},
+		OutputSerialization: &types.OutputSerialization{
+			JSON: &types.JSONOutput{},
+		},
+	}
+
+	resp, err := app.s3client.SelectObjectContent(ctx, params)
+	if err != nil {
+		return err
+	}
+	stream := resp.GetStream()
+	defer stream.Close()
+
+	for event := range stream.Events() {
+		v, ok := event.(*types.SelectObjectContentEventStreamMemberRecords)
+		if ok {
+			var result S3SelectResult
+			if isCount {
+				if err := json.Unmarshal(v.Value.Payload, &result); err != nil {
+					return err
+				}
+			}
+			result.Value = string(v.Value.Payload)
+			sender <- result
 		}
 	}
 

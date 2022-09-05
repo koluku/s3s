@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"strconv"
 )
 
-func checkArgs(ctx context.Context, paths []string) error {
+func checkArgs(paths []string) error {
 	if isDelve {
 		if len(paths) > 1 {
 			return fmt.Errorf("too many argument error")
@@ -20,23 +18,15 @@ func checkArgs(ctx context.Context, paths []string) error {
 	return nil
 }
 
-func checkQuery(ctx context.Context, query string, where string, limit int) (string, error) {
-	if query == "" {
-		query = DEFAULT_QUERY
+func checkQuery(query string, where string, limit int, count bool) error {
+	if query != "" {
 		if where != "" {
-			query = query + " WHERE " + where
+			return fmt.Errorf("can't use where option with query option")
 		}
 		if limit != 0 {
-			query = query + " LIMIT " + strconv.Itoa(limit)
-		}
-	} else {
-		if where != "" {
-			return "", fmt.Errorf("can't use where option with query option")
-		}
-		if limit != 0 {
-			return "", fmt.Errorf("can't use where option with limit option")
+			return fmt.Errorf("can't use where option with limit option")
 		}
 	}
 
-	return query, nil
+	return nil
 }
