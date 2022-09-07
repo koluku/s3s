@@ -15,10 +15,12 @@ import (
 )
 
 const (
-	DEFAULT_QUERY        = "SELECT * FROM S3Object s"
-	DEFAULT_THREAD_COUNT = 150
-	DEFAULT_POOL_SIZE    = 1000
-	DEFAULT_MAX_RETRIES  = 20
+	DEFAULT_QUERY            = "SELECT * FROM S3Object s"
+	DEFAULT_THREAD_COUNT     = 150
+	DEFAULT_POOL_SIZE        = 1000
+	DEFAULT_MAX_RETRIES      = 20
+	DEFAULT_FIELD_DELIMITER  = ","
+	DEFAULT_RECORD_DELIMITER = "\n"
 )
 
 var (
@@ -29,10 +31,17 @@ var (
 	region string
 
 	// S3 Select Query
-	query   string
-	where   string
-	limit   int
-	isCount bool
+	queryStr        string
+	where           string
+	limit           int
+	isCount         bool
+	fieldDelimiter  string
+	recordDelimiter string
+
+	isJSON    bool
+	isCSV     bool
+	isALBLogs bool
+	isCFLogs  bool
 
 	// command option
 	threadCount int
@@ -60,7 +69,7 @@ func main() {
 				Name:        "query",
 				Aliases:     []string{"q"},
 				Usage:       "a query for S3 Select",
-				Destination: &query,
+				Destination: &queryStr,
 			},
 			&cli.StringFlag{
 				Name:        "where",
@@ -79,6 +88,38 @@ func main() {
 				Aliases:     []string{"c"},
 				Usage:       "max number of results from each key to return",
 				Destination: &isCount,
+			},
+			&cli.StringFlag{
+				Name:        "field_delimiter",
+				Aliases:     []string{"d"},
+				Usage:       "to read fields for CSV files",
+				Destination: &fieldDelimiter,
+			},
+			&cli.StringFlag{
+				Name:        "record_delimiter",
+				Aliases:     []string{"D"},
+				Usage:       "to read records for CSV files",
+				Destination: &recordDelimiter,
+			},
+			&cli.BoolFlag{
+				Name:        "as_json",
+				Usage:       "",
+				Destination: &isJSON,
+			},
+			&cli.BoolFlag{
+				Name:        "as_csv",
+				Usage:       "",
+				Destination: &isCSV,
+			},
+			&cli.BoolFlag{
+				Name:        "alb_logs",
+				Usage:       "",
+				Destination: &isALBLogs,
+			},
+			&cli.BoolFlag{
+				Name:        "cf_logs",
+				Usage:       "",
+				Destination: &isCFLogs,
 			},
 			&cli.IntFlag{
 				Name:        "thread_count",
@@ -120,11 +161,41 @@ func cmd(ctx context.Context, paths []string) error {
 	if err := checkArgs(paths); err != nil {
 		return err
 	}
-	if err := checkQuery(query, where, limit, isCount); err != nil {
+	if err := checkQuery(queryStr, where, limit, isCount); err != nil {
 		return err
 	}
-	if query == "" {
-		query = buildQuery(where, limit, isCount)
+	if err := checkFileFormat(fieldDelimiter, recordDelimiter, isJSON, isCSV, isALBLogs, isCFLogs); err != nil {
+		return err
+	}
+
+	if queryStr == "" {
+		query := &query{
+			where:   where,
+			limit:   limit,
+			isCount: isCount,
+		}
+		queryStr = query.build()
+	}
+	var queryOption *s3s.S3SelectOption
+	switch {
+	case isCSV:
+		queryOption = &s3s.S3SelectOption{
+			IsCSV:           true,
+			FieldDelimiter:  DEFAULT_FIELD_DELIMITER,
+			RecordDelimiter: DEFAULT_RECORD_DELIMITER,
+		}
+	case isALBLogs:
+		queryOption = &s3s.S3SelectOption{
+			IsCSV:           true,
+			FieldDelimiter:  " ",
+			RecordDelimiter: DEFAULT_RECORD_DELIMITER,
+		}
+	default:
+		queryOption = &s3s.S3SelectOption{
+			IsCSV:           true,
+			FieldDelimiter:  fieldDelimiter,
+			RecordDelimiter: recordDelimiter,
+		}
 	}
 
 	// Initialize
@@ -151,7 +222,7 @@ func cmd(ctx context.Context, paths []string) error {
 		return nil
 	})
 	eg.Go(func() error {
-		if err := execS3Select(egctx, app, ch); err != nil {
+		if err := execS3Select(egctx, app, ch, queryStr, queryOption); err != nil {
 			return err
 		}
 		return nil

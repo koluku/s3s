@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -124,7 +125,13 @@ func GetS3KeysWithChannel(ctx context.Context, app *App, sender chan<- Path, buc
 	return nil
 }
 
-func S3Select(ctx context.Context, app *App, bucket string, key string, query string) error {
+type S3SelectOption struct {
+	IsCSV           bool
+	FieldDelimiter  string
+	RecordDelimiter string
+}
+
+func S3Select(ctx context.Context, app *App, bucket string, key string, query string, option *S3SelectOption) error {
 	compressionType := suggestCompressionType(key)
 
 	params := &s3.SelectObjectContentInput{
@@ -166,12 +173,17 @@ func S3Select(ctx context.Context, app *App, bucket string, key string, query st
 	return nil
 }
 
+type S3SelectQuery struct {
+	Value string `json:"-"`
+	Count int    `json:"_1"`
+}
+
 type S3SelectResult struct {
 	Value string `json:"-"`
 	Count int    `json:"_1"`
 }
 
-func S3SelectWithChannel(ctx context.Context, app *App, bucket string, key string, query string, isCount bool, sender chan<- S3SelectResult) error {
+func S3SelectWithChannel(ctx context.Context, app *App, bucket string, key string, query string, isCount bool, sender chan<- S3SelectResult, option *S3SelectOption) error {
 	compressionType := suggestCompressionType(key)
 
 	params := &s3.SelectObjectContentInput{
@@ -180,15 +192,29 @@ func S3SelectWithChannel(ctx context.Context, app *App, bucket string, key strin
 		ExpressionType:  types.ExpressionTypeSql,
 		Expression:      aws.String(query),
 		RequestProgress: &types.RequestProgress{},
-		InputSerialization: &types.InputSerialization{
+	}
+	if option.IsCSV {
+		params.InputSerialization = &types.InputSerialization{
+			CompressionType: compressionType,
+			CSV: &types.CSVInput{
+				FieldDelimiter:  aws.String(option.FieldDelimiter),
+				RecordDelimiter: aws.String(option.RecordDelimiter),
+				FileHeaderInfo:  types.FileHeaderInfoIgnore,
+			},
+		}
+		params.OutputSerialization = &types.OutputSerialization{
+			CSV: &types.CSVOutput{},
+		}
+	} else {
+		params.InputSerialization = &types.InputSerialization{
 			CompressionType: compressionType,
 			JSON: &types.JSONInput{
 				Type: types.JSONTypeLines,
 			},
-		},
-		OutputSerialization: &types.OutputSerialization{
+		}
+		params.OutputSerialization = &types.OutputSerialization{
 			JSON: &types.JSONOutput{},
-		},
+		}
 	}
 
 	resp, err := app.s3client.SelectObjectContent(ctx, params)
@@ -203,8 +229,15 @@ func S3SelectWithChannel(ctx context.Context, app *App, bucket string, key strin
 		if ok {
 			var result S3SelectResult
 			if isCount {
-				if err := json.Unmarshal(v.Value.Payload, &result); err != nil {
-					return err
+				if option.IsCSV {
+					result.Count, err = strconv.Atoi(strings.TrimRight(string(v.Value.Payload), "\n"))
+					if err != nil {
+						return err
+					}
+				} else {
+					if err := json.Unmarshal(v.Value.Payload, &result); err != nil {
+						return err
+					}
 				}
 			}
 			result.Value = string(v.Value.Payload)
