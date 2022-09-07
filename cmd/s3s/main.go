@@ -18,6 +18,7 @@ const (
 	DEFAULT_QUERY        = "SELECT * FROM S3Object s"
 	DEFAULT_THREAD_COUNT = 150
 	DEFAULT_POOL_SIZE    = 1000
+	DEFAULT_MAX_RETRIES  = 20
 )
 
 var (
@@ -35,6 +36,7 @@ var (
 
 	// command option
 	threadCount int
+	maxRetries  int
 	isDelve     bool
 )
 
@@ -85,6 +87,13 @@ func main() {
 				Value:       DEFAULT_THREAD_COUNT,
 				Destination: &threadCount,
 			},
+			&cli.IntFlag{
+				Name:        "max_retries",
+				Aliases:     []string{"M"},
+				Usage:       "max number of api requests to retry",
+				Value:       DEFAULT_MAX_RETRIES,
+				Destination: &maxRetries,
+			},
 			&cli.BoolFlag{
 				Name:        "delve",
 				Usage:       "like directory move before querying",
@@ -119,7 +128,7 @@ func cmd(ctx context.Context, paths []string) error {
 	}
 
 	// Initialize
-	app, err := s3s.NewApp(ctx, region)
+	app, err := s3s.NewApp(ctx, region, maxRetries)
 	if err != nil {
 		return err
 	}
