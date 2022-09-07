@@ -16,13 +16,16 @@ type App struct {
 	s3client *s3.Client
 }
 
-func NewApp(ctx context.Context, region string) (*App, error) {
+func NewApp(ctx context.Context, region string, maxRetries int) (*App, error) {
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
 		return nil, err
 	}
 
-	s3Client := s3.NewFromConfig(cfg)
+	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.RetryMaxAttempts = maxRetries
+		o.RetryMode = aws.RetryModeStandard
+	})
 	return &App{s3client: s3Client}, nil
 }
 
