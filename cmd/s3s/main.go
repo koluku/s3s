@@ -17,6 +17,7 @@ import (
 const (
 	DEFAULT_QUERY        = "SELECT * FROM S3Object s"
 	DEFAULT_THREAD_COUNT = 150
+	DEFAULT_POOL_SIZE    = 1000
 )
 
 var (
@@ -27,9 +28,10 @@ var (
 	region string
 
 	// S3 Select Query
-	query string
-	where string
-	limit int
+	query   string
+	where   string
+	limit   int
+	isCount bool
 
 	// command option
 	threadCount int
@@ -70,6 +72,12 @@ func main() {
 				Usage:       "max number of results from each key to return",
 				Destination: &limit,
 			},
+			&cli.BoolFlag{
+				Name:        "count",
+				Aliases:     []string{"c"},
+				Usage:       "max number of results from each key to return",
+				Destination: &isCount,
+			},
 			&cli.IntFlag{
 				Name:        "thread_count",
 				Aliases:     []string{"t"},
@@ -85,7 +93,10 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			return cmd(c.Context, c.Args().Slice())
+			if err := cmd(c.Context, c.Args().Slice()); err != nil {
+				return err
+			}
+			return nil
 		},
 	}
 
@@ -95,22 +106,19 @@ func main() {
 	}
 }
 
-type bucketKeys struct {
-	bucket string
-	keys   []string
-}
-
 func cmd(ctx context.Context, paths []string) error {
 	// Arguments Check
-	if err := checkArgs(ctx, paths); err != nil {
+	if err := checkArgs(paths); err != nil {
 		return err
 	}
-	builtQuery, err := checkQuery(ctx, query, where, limit)
-	if err != nil {
+	if err := checkQuery(query, where, limit, isCount); err != nil {
 		return err
 	}
-	query = builtQuery
+	if query == "" {
+		query = buildQuery(where, limit, isCount)
+	}
 
+	// Initialize
 	app, err := s3s.NewApp(ctx, region)
 	if err != nil {
 		return err
@@ -124,15 +132,26 @@ func cmd(ctx context.Context, paths []string) error {
 		paths = newPaths
 	}
 
-	targetBucketKeys := make(chan bucketKeys, len(paths))
-	if err := getBucketKeys(ctx, app, paths, targetBucketKeys); err != nil {
+	// Execution
+	ch := make(chan s3s.Path, DEFAULT_POOL_SIZE)
+	eg, egctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		if err := getBucketKeys(egctx, app, ch, paths); err != nil {
+			return err
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		if err := execS3Select(egctx, app, ch); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err := eg.Wait(); err != nil {
 		return err
 	}
 
-	if err := execS3Select(ctx, app, targetBucketKeys); err != nil {
-		return err
-	}
-
+	// Finalize
 	if isDelve {
 		for _, path := range paths {
 			fmt.Fprintln(os.Stderr, path)
@@ -143,7 +162,7 @@ func cmd(ctx context.Context, paths []string) error {
 }
 
 // Get S3 Object Keys
-func getBucketKeys(ctx context.Context, app *s3s.App, paths []string, targetBucketKeys chan bucketKeys) error {
+func getBucketKeys(ctx context.Context, app *s3s.App, ch chan<- s3s.Path, paths []string) error {
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.SetLimit(threadCount)
 	for _, path := range paths {
@@ -158,42 +177,16 @@ func getBucketKeys(ctx context.Context, app *s3s.App, paths []string, targetBuck
 			prefix = strings.TrimPrefix(u.Path, "/")
 			prefix = strings.TrimSuffix(prefix, "/")
 
-			s3Keys, err := s3s.GetS3Keys(egctx, app, bucket, prefix)
-			if err != nil {
+			if s3s.GetS3KeysWithChannel(egctx, app, ch, bucket, prefix); err != nil {
 				return err
 			}
-			targetBucketKeys <- bucketKeys{bucket: bucket, keys: s3Keys}
-
 			return nil
 		})
 	}
 
 	err := eg.Wait()
-	close(targetBucketKeys)
+	close(ch)
 	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func execS3Select(ctx context.Context, app *s3s.App, targetBucketKeys chan bucketKeys) error {
-	eg, egctx := errgroup.WithContext(ctx)
-	eg.SetLimit(threadCount)
-	for bk := range targetBucketKeys {
-		bucket := bk.bucket
-		for _, key := range bk.keys {
-			key := key
-			eg.Go(func() error {
-				if err := s3s.S3Select(egctx, app, bucket, key, query); err != nil {
-					return err
-				}
-				return nil
-			})
-		}
-	}
-
-	if err := eg.Wait(); err != nil {
 		return err
 	}
 
