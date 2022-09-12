@@ -38,8 +38,7 @@ var (
 	fieldDelimiter  string
 	recordDelimiter string
 
-	isJSON    bool
-	isCSV     bool
+	fromCSV   bool
 	isALBLogs bool
 	isCFLogs  bool
 
@@ -102,14 +101,9 @@ func main() {
 				Destination: &recordDelimiter,
 			},
 			&cli.BoolFlag{
-				Name:        "as_json",
+				Name:        "from_csv",
 				Usage:       "",
-				Destination: &isJSON,
-			},
-			&cli.BoolFlag{
-				Name:        "as_csv",
-				Usage:       "",
-				Destination: &isCSV,
+				Destination: &fromCSV,
 			},
 			&cli.BoolFlag{
 				Name:        "alb_logs",
@@ -164,7 +158,7 @@ func cmd(ctx context.Context, paths []string) error {
 	if err := checkQuery(queryStr, where, limit, isCount); err != nil {
 		return err
 	}
-	if err := checkFileFormat(fieldDelimiter, recordDelimiter, isJSON, isCSV, isALBLogs, isCFLogs); err != nil {
+	if err := checkFileFormat(fieldDelimiter, recordDelimiter, fromCSV, isALBLogs, isCFLogs); err != nil {
 		return err
 	}
 
@@ -178,7 +172,7 @@ func cmd(ctx context.Context, paths []string) error {
 	}
 	var queryOption *s3s.S3SelectOption
 	switch {
-	case isCSV:
+	case fromCSV:
 		queryOption = &s3s.S3SelectOption{
 			IsCSV:           true,
 			FieldDelimiter:  DEFAULT_FIELD_DELIMITER,
@@ -190,11 +184,17 @@ func cmd(ctx context.Context, paths []string) error {
 			FieldDelimiter:  " ",
 			RecordDelimiter: DEFAULT_RECORD_DELIMITER,
 		}
-	default:
+	case isCFLogs:
 		queryOption = &s3s.S3SelectOption{
 			IsCSV:           true,
-			FieldDelimiter:  fieldDelimiter,
-			RecordDelimiter: recordDelimiter,
+			FieldDelimiter:  " ",
+			RecordDelimiter: DEFAULT_RECORD_DELIMITER,
+		}
+	default:
+		queryOption = &s3s.S3SelectOption{
+			IsCSV:           false,
+			FieldDelimiter:  "",
+			RecordDelimiter: "",
 		}
 	}
 

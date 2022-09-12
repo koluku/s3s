@@ -31,10 +31,10 @@ func checkQuery(queryStr string, where string, limit int, isCount bool) error {
 	return nil
 }
 
-func checkFileFormat(fieldDelimiter string, recordDelimiter string, isJSON bool, isCSV bool, isALBLogs bool, isCFLogs bool) error {
+func checkFileFormat(fieldDelimiter string, recordDelimiter string, isCSV bool, isALBLogs bool, isCFLogs bool) error {
 	var asCSV = fieldDelimiter != "" || recordDelimiter != ""
 	var count int
-	for _, format := range []bool{asCSV, isJSON, isCSV, isALBLogs, isCFLogs} {
+	for _, format := range []bool{asCSV, isCSV, isALBLogs, isCFLogs} {
 		if format {
 			count++
 		}
@@ -44,7 +44,7 @@ func checkFileFormat(fieldDelimiter string, recordDelimiter string, isJSON bool,
 		if asCSV {
 			return fmt.Errorf("too many option: field_delimiter and recordDelimiter can't use with isJSON, isCSV, isALBLogs or isCFLogs")
 		} else {
-			return fmt.Errorf("too many option: isJSON, isCSV, isALBLogs or isCFLogs")
+			return fmt.Errorf("too many option: fromCSV, isALBLogs or isCFLogs")
 		}
 	}
 
