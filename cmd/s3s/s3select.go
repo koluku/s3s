@@ -73,7 +73,7 @@ func selectOneKey(ctx context.Context, app *s3s.App, reciever <-chan s3s.Path, s
 		bucket := r.Bucket
 		key := r.Key
 		eg.Go(func() error {
-			if err := s3s.S3SelectWithChannel(egctx, app, bucket, key, queryStr, isCount, sender, queryOption); err != nil {
+			if err := app.S3SelectWithChannel(egctx, bucket, key, queryStr, isCount, sender, queryOption); err != nil {
 				return err
 			}
 			return nil
