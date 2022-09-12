@@ -257,7 +257,7 @@ func getBucketKeys(ctx context.Context, app *s3s.App, ch chan<- s3s.Path, paths 
 			prefix = strings.TrimPrefix(u.Path, "/")
 			prefix = strings.TrimSuffix(prefix, "/")
 
-			if s3s.GetS3KeysWithChannel(egctx, app, ch, bucket, prefix); err != nil {
+			if app.GetS3KeysWithChannel(egctx, ch, bucket, prefix); err != nil {
 				return err
 			}
 			return nil
