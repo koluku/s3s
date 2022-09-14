@@ -7,7 +7,7 @@ func buildQuery(where string, limit int, isCount bool) string {
 		return DEFAULT_QUERY
 	}
 
-	query = "SELECT"
+	query := "SELECT"
 	if isCount {
 		query += " COUNT(*)"
 	} else {

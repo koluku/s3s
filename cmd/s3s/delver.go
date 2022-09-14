@@ -40,7 +40,7 @@ func pathDelver(ctx context.Context, app *s3s.App, paths []string) ([]string, er
 }
 
 func delveBucketList(ctx context.Context, app *s3s.App) (string, error) {
-	buckets, err := s3s.GetS3Bucket(ctx, app)
+	buckets, err := app.GetS3Bucket(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -59,7 +59,7 @@ func delveBucketList(ctx context.Context, app *s3s.App) (string, error) {
 }
 
 func delvePrefix(ctx context.Context, app *s3s.App, bucket string, prefix string) (string, error) {
-	s3Dirs, err := s3s.GetS3Dir(ctx, app, bucket, prefix)
+	s3Dirs, err := app.GetS3Dir(ctx, bucket, prefix)
 	if err != nil {
 		return "", err
 	}
