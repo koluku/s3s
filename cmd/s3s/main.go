@@ -4,20 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 
 	"github.com/koluku/s3s"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
 	DEFAULT_QUERY            = "SELECT * FROM S3Object s"
 	DEFAULT_THREAD_COUNT     = 150
-	DEFAULT_POOL_SIZE        = 1000
 	DEFAULT_MAX_RETRIES      = 20
 	DEFAULT_FIELD_DELIMITER  = ","
 	DEFAULT_RECORD_DELIMITER = "\n"
@@ -31,14 +27,12 @@ var (
 	region string
 
 	// S3 Select Query
-	queryStr        string
-	where           string
-	limit           int
-	isCount         bool
-	fieldDelimiter  string
-	recordDelimiter string
+	queryStr string
+	where    string
+	limit    int
+	isCount  bool
 
-	fromCSV   bool
+	isCSV     bool
 	isALBLogs bool
 	isCFLogs  bool
 
@@ -88,43 +82,33 @@ func main() {
 				Usage:       "max number of results from each key to return",
 				Destination: &isCount,
 			},
-			&cli.StringFlag{
-				Name:        "field_delimiter",
-				Aliases:     []string{"d"},
-				Usage:       "to read fields for CSV files",
-				Destination: &fieldDelimiter,
-			},
-			&cli.StringFlag{
-				Name:        "record_delimiter",
-				Aliases:     []string{"D"},
-				Usage:       "to read records for CSV files",
-				Destination: &recordDelimiter,
-			},
 			&cli.BoolFlag{
-				Name:        "from_csv",
+				Name:        "csv",
 				Usage:       "",
-				Destination: &fromCSV,
+				Destination: &isCSV,
 			},
 			&cli.BoolFlag{
-				Name:        "alb_logs",
+				Name:        "alb-logs",
+				Aliases:     []string{"alb_logs"},
 				Usage:       "",
 				Destination: &isALBLogs,
 			},
 			&cli.BoolFlag{
-				Name:        "cf_logs",
+				Name:        "cf-logs",
+				Aliases:     []string{"cf_logs"},
 				Usage:       "",
 				Destination: &isCFLogs,
 			},
 			&cli.IntFlag{
-				Name:        "thread_count",
-				Aliases:     []string{"t"},
+				Name:        "thread-count",
+				Aliases:     []string{"t, thread_count"},
 				Usage:       "max number of api requests to concurrently",
 				Value:       DEFAULT_THREAD_COUNT,
 				Destination: &threadCount,
 			},
 			&cli.IntFlag{
-				Name:        "max_retries",
-				Aliases:     []string{"M"},
+				Name:        "max-retries",
+				Aliases:     []string{"M, max_retries"},
 				Usage:       "max number of api requests to retry",
 				Value:       DEFAULT_MAX_RETRIES,
 				Destination: &maxRetries,
@@ -158,48 +142,12 @@ func cmd(ctx context.Context, paths []string) error {
 	if err := checkQuery(queryStr, where, limit, isCount); err != nil {
 		return err
 	}
-	if err := checkFileFormat(fieldDelimiter, recordDelimiter, fromCSV, isALBLogs, isCFLogs); err != nil {
+	if err := checkFileFormat(isCSV, isALBLogs, isCFLogs); err != nil {
 		return err
 	}
 
-	if queryStr == "" {
-		query := &query{
-			where:   where,
-			limit:   limit,
-			isCount: isCount,
-		}
-		queryStr = query.build()
-	}
-	var queryOption *s3s.S3SelectOption
-	switch {
-	case fromCSV:
-		queryOption = &s3s.S3SelectOption{
-			IsCSV:           true,
-			FieldDelimiter:  DEFAULT_FIELD_DELIMITER,
-			RecordDelimiter: DEFAULT_RECORD_DELIMITER,
-		}
-	case isALBLogs:
-		queryOption = &s3s.S3SelectOption{
-			IsCSV:           true,
-			FieldDelimiter:  " ",
-			RecordDelimiter: DEFAULT_RECORD_DELIMITER,
-		}
-	case isCFLogs:
-		queryOption = &s3s.S3SelectOption{
-			IsCSV:           true,
-			FieldDelimiter:  " ",
-			RecordDelimiter: DEFAULT_RECORD_DELIMITER,
-		}
-	default:
-		queryOption = &s3s.S3SelectOption{
-			IsCSV:           false,
-			FieldDelimiter:  "",
-			RecordDelimiter: "",
-		}
-	}
-
 	// Initialize
-	app, err := s3s.NewApp(ctx, region, maxRetries)
+	app, err := s3s.NewApp(ctx, region, maxRetries, threadCount)
 	if err != nil {
 		return err
 	}
@@ -213,61 +161,35 @@ func cmd(ctx context.Context, paths []string) error {
 	}
 
 	// Execution
-	ch := make(chan s3s.Path, DEFAULT_POOL_SIZE)
-	eg, egctx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		if err := getBucketKeys(egctx, app, ch, paths); err != nil {
-			return err
-		}
-		return nil
-	})
-	eg.Go(func() error {
-		if err := execS3Select(egctx, app, ch, queryStr, queryOption); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err := eg.Wait(); err != nil {
-		return err
+	if queryStr == "" {
+		queryStr = buildQuery(where, limit, isCount)
 	}
+	queryInfo := &s3s.QueryInfo{
+		IsCountMode: isCount,
+	}
+	switch {
+	case isCSV:
+		queryInfo.FormatType = s3s.FormatTypeCSV
+		queryInfo.FieldDelimiter = ","
+		queryInfo.RecordDelimiter = "\n"
+	case isALBLogs:
+		queryInfo.FormatType = s3s.FormatTypeALBLogs
+		queryInfo.FieldDelimiter = " "
+		queryInfo.RecordDelimiter = "\n"
+	case isCFLogs:
+		queryInfo.FormatType = s3s.FormatTypeCFLogs
+		queryInfo.FieldDelimiter = " "
+		queryInfo.RecordDelimiter = "\n"
+	default:
+		queryInfo.FormatType = s3s.FormatTypeJSON
+	}
+	app.Run(ctx, paths, queryStr, queryInfo)
 
 	// Finalize
 	if isDelve {
 		for _, path := range paths {
 			fmt.Fprintln(os.Stderr, path)
 		}
-	}
-
-	return nil
-}
-
-// Get S3 Object Keys
-func getBucketKeys(ctx context.Context, app *s3s.App, ch chan<- s3s.Path, paths []string) error {
-	eg, egctx := errgroup.WithContext(ctx)
-	eg.SetLimit(threadCount)
-	for _, path := range paths {
-		path := path
-		eg.Go(func() error {
-			u, err := url.Parse(path)
-			if err != nil {
-				return err
-			}
-			var bucket, prefix string
-			bucket = u.Hostname()
-			prefix = strings.TrimPrefix(u.Path, "/")
-			prefix = strings.TrimSuffix(prefix, "/")
-
-			if app.GetS3KeysWithChannel(egctx, ch, bucket, prefix); err != nil {
-				return err
-			}
-			return nil
-		})
-	}
-
-	err := eg.Wait()
-	close(ch)
-	if err != nil {
-		return err
 	}
 
 	return nil
