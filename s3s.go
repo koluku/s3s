@@ -2,6 +2,7 @@ package s3s
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -91,6 +92,7 @@ func (app *App) getBucketKeys(ctx context.Context, ch chan<- Path, paths []strin
 }
 
 func (app *App) execS3Select(ctx context.Context, reciever <-chan Path, queryStr string, info *QueryInfo) error {
+	var count int
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.SetLimit(app.threadCount)
 
@@ -133,15 +135,21 @@ func (app *App) execS3Select(ctx context.Context, reciever <-chan Path, queryStr
 		}
 
 		eg.Go(func() error {
-			if err := app.S3Select(egctx, input, info); err != nil {
+			result, err := app.S3Select(egctx, input, info)
+			if err != nil {
 				return err
 			}
+			count += result.Count
 			return nil
 		})
 	}
 
 	if err := eg.Wait(); err != nil {
 		return err
+	}
+
+	if info.IsCountMode {
+		fmt.Println(count)
 	}
 
 	return nil

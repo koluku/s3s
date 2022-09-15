@@ -8,7 +8,7 @@ S3S is a go binary instead of [vast-engineering/s3select](https://github.com/vas
 ## Usage
 
 ```console
-$ ./s3s --help
+$ s3s --help
 NAME:
    s3s - Easy S3 select like searching in directories
 

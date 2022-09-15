@@ -1,6 +1,7 @@
 package s3s
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -93,51 +94,57 @@ type QueryInfo struct {
 	IsCountMode     bool
 }
 
-func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) error {
+func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) (*Result, error) {
 	params := input.toParameter()
 	resp, err := app.s3.SelectObjectContent(ctx, params)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	stream := resp.GetStream()
 	defer stream.Close()
 
+	var result Result
 	for event := range stream.Events() {
 		record, ok := event.(*types.SelectObjectContentEventStreamMemberRecords)
 		if ok {
-			if info.FormatType == FormatTypeALBLogs {
-				var alblogs ALBLogsSchema
-				if err := json.Unmarshal(record.Value.Payload, &alblogs); err != nil {
-					return err
+			if info.IsCountMode {
+				var schema CountOnlySchema
+				if err := json.Unmarshal(record.Value.Payload, &schema); err != nil {
+					return nil, err
 				}
-				if info.IsCountMode {
-					if err := json.Unmarshal(record.Value.Payload, &alblogs); err != nil {
-						return err
-					}
-				} else {
-					buf, err := json.Marshal(alblogs)
-					if err != nil {
-						return err
+
+				result.Count += schema.Count
+				continue
+			}
+
+			if info.FormatType == FormatTypeALBLogs {
+				lines := bytes.Split(record.Value.Payload, []byte("\n"))
+				for _, line := range lines[:len(lines)-1] {
+					var schema ALBLogsSchema
+
+					if err := json.Unmarshal(line, &schema); err != nil {
+						return nil, err
 					}
 
+					buf, err := json.Marshal(schema)
+					if err != nil {
+						return nil, err
+					}
 					fmt.Println(string(buf))
 				}
 			} else if info.FormatType == FormatTypeCFLogs {
-				var cflogs CFLogsSchema
-				if err := json.Unmarshal(record.Value.Payload, &cflogs); err != nil {
-					return err
-				}
+				lines := bytes.Split(record.Value.Payload, []byte("\n"))
+				for _, line := range lines[:len(lines)-1] {
+					var schema CFLogsSchema
 
-				if info.IsCountMode {
-					if err := json.Unmarshal(record.Value.Payload, &cflogs); err != nil {
-						return err
+					if err := json.Unmarshal(line, &schema); err != nil {
+						return nil, err
 					}
-				} else {
-					buf, err := json.Marshal(cflogs)
+
+					buf, err := json.Marshal(schema)
 					if err != nil {
-						return err
+						return nil, err
 					}
-
 					fmt.Println(string(buf))
 				}
 			} else {
@@ -147,10 +154,18 @@ func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) e
 	}
 
 	if err := stream.Err(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &result, nil
+}
+
+type Result struct {
+	Count int
+}
+
+type CountOnlySchema struct {
+	Count int `json:"_1"`
 }
 
 type ALBLogsSchema struct {
@@ -172,6 +187,7 @@ type ALBLogsSchema struct {
 	SslProtocol            interface{} `json:"ssl_protocol"`
 	TargetGroupArn         interface{} `json:"target_group_arn"`
 	TraceId                interface{} `json:"trace_id"`
+	DomainName             interface{} `json:"domain_name"`
 	ChosenCertArn          interface{} `json:"chosen_cert_arn"`
 	MatchedRulePriority    interface{} `json:"matched_rule_priority"`
 	RequestCreationTime    interface{} `json:"request_creation_time"`
@@ -209,16 +225,17 @@ func (schema *ALBLogsSchema) UnmarshalJSON(b []byte) error {
 	schema.SslProtocol = raw["_16"]
 	schema.TargetGroupArn = raw["_17"]
 	schema.TraceId = raw["_18"]
-	schema.ChosenCertArn = raw["_19"]
-	schema.MatchedRulePriority = raw["_20"]
-	schema.RequestCreationTime = raw["_21"]
-	schema.ActionsExecuted = raw["_22"]
-	schema.RedirectUrl = raw["_23"]
-	schema.ErrorReason = raw["_24"]
-	schema.TargetPortList = raw["_25"]
-	schema.TargetStatusCodeList = raw["_26"]
-	schema.Classification = raw["_27"]
-	schema.ClassificationReason = raw["_28"]
+	schema.DomainName = raw["_19"]
+	schema.ChosenCertArn = raw["_20"]
+	schema.MatchedRulePriority = raw["_21"]
+	schema.RequestCreationTime = raw["_22"]
+	schema.ActionsExecuted = raw["_23"]
+	schema.RedirectUrl = raw["_24"]
+	schema.ErrorReason = raw["_25"]
+	schema.TargetPortList = raw["_26"]
+	schema.TargetStatusCodeList = raw["_27"]
+	schema.Classification = raw["_28"]
+	schema.ClassificationReason = raw["_29"]
 
 	return nil
 }
