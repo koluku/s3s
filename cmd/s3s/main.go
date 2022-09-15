@@ -178,7 +178,7 @@ func cmd(ctx context.Context, paths []string) error {
 		queryInfo.RecordDelimiter = "\n"
 	case isCFLogs:
 		queryInfo.FormatType = s3s.FormatTypeCFLogs
-		queryInfo.FieldDelimiter = " "
+		queryInfo.FieldDelimiter = "\t"
 		queryInfo.RecordDelimiter = "\n"
 	default:
 		queryInfo.FormatType = s3s.FormatTypeJSON
