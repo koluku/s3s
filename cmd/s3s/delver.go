@@ -9,19 +9,20 @@ import (
 
 	"github.com/koluku/s3s"
 	"github.com/ktr0731/go-fuzzyfinder"
+	"github.com/pkg/errors"
 )
 
 func pathDelver(ctx context.Context, app *s3s.App, paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		path, err := delveBucketList(ctx, app)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		paths = []string{path}
 	} else {
 		u, err := url.Parse(paths[0])
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		var bucket, prefix string
@@ -30,7 +31,7 @@ func pathDelver(ctx context.Context, app *s3s.App, paths []string) ([]string, er
 
 		path, err := delvePrefix(ctx, app, bucket, prefix)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		paths = []string{path}
@@ -42,7 +43,7 @@ func pathDelver(ctx context.Context, app *s3s.App, paths []string) ([]string, er
 func delveBucketList(ctx context.Context, app *s3s.App) (string, error) {
 	buckets, err := app.GetS3Bucket(ctx)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	index, err := fuzzyfinder.Find(
@@ -52,7 +53,7 @@ func delveBucketList(ctx context.Context, app *s3s.App) (string, error) {
 		},
 	)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return delvePrefix(ctx, app, buckets[index], "")
@@ -61,7 +62,7 @@ func delveBucketList(ctx context.Context, app *s3s.App) (string, error) {
 func delvePrefix(ctx context.Context, app *s3s.App, bucket string, prefix string) (string, error) {
 	s3Dirs, err := app.GetS3Dir(ctx, bucket, prefix)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	current := fmt.Sprintf("Query↵ (%s/%s)", bucket, prefix)
@@ -81,7 +82,7 @@ func delvePrefix(ctx context.Context, app *s3s.App, bucket string, prefix string
 		},
 	)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	switch index {

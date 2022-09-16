@@ -8,6 +8,7 @@ import (
 	"os/signal"
 
 	"github.com/koluku/s3s"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 )
 
@@ -40,6 +41,7 @@ var (
 	threadCount int
 	maxRetries  int
 	isDelve     bool
+	isDebug     bool
 )
 
 func main() {
@@ -119,10 +121,16 @@ func main() {
 				Value:       false,
 				Destination: &isDelve,
 			},
+			&cli.BoolFlag{
+				Name:        "debug",
+				Usage:       "erorr check for developper",
+				Value:       false,
+				Destination: &isDebug,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if err := cmd(c.Context, c.Args().Slice()); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			return nil
 		},
@@ -130,6 +138,9 @@ func main() {
 
 	err := app.RunContext(ctx, os.Args)
 	if err != nil {
+		if isDebug {
+			log.Fatalf("%+v\n", err)
+		}
 		log.Fatal(err)
 	}
 }
@@ -137,25 +148,25 @@ func main() {
 func cmd(ctx context.Context, paths []string) error {
 	// Arguments Check
 	if err := checkArgs(paths); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := checkQuery(queryStr, where, limit, isCount); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := checkFileFormat(isCSV, isALBLogs, isCFLogs); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// Initialize
 	app, err := s3s.NewApp(ctx, region, maxRetries, threadCount)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if isDelve {
 		newPaths, err := pathDelver(ctx, app, paths)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		paths = newPaths
 	}

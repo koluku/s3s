@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -20,7 +21,7 @@ type App struct {
 func NewApp(ctx context.Context, region string, maxRetries int, threadCount int) (*App, error) {
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -42,19 +43,19 @@ func (app *App) Run(ctx context.Context, paths []string, queryStr string, queryI
 
 	eg.Go(func() error {
 		if err := app.getBucketKeys(egctx, ch, paths); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		return nil
 	})
 	eg.Go(func() error {
 		if err := app.execS3Select(egctx, ch, queryStr, queryInfo); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		return nil
 	})
 
 	if err := eg.Wait(); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -68,15 +69,14 @@ func (app *App) getBucketKeys(ctx context.Context, ch chan<- Path, paths []strin
 		eg.Go(func() error {
 			u, err := url.Parse(path)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			var bucket, prefix string
 			bucket = u.Hostname()
 			prefix = strings.TrimPrefix(u.Path, "/")
-			prefix = strings.TrimSuffix(prefix, "/")
 
-			if app.GetS3KeysWithChannel(egctx, ch, bucket, prefix); err != nil {
-				return err
+			if app.GetS3Keys(egctx, ch, bucket, prefix); err != nil {
+				return errors.WithStack(err)
 			}
 			return nil
 		})
@@ -85,7 +85,7 @@ func (app *App) getBucketKeys(ctx context.Context, ch chan<- Path, paths []strin
 	err := eg.Wait()
 	close(ch)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -137,7 +137,7 @@ func (app *App) execS3Select(ctx context.Context, reciever <-chan Path, queryStr
 		eg.Go(func() error {
 			result, err := app.S3Select(egctx, input, info)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			count += result.Count
 			return nil
@@ -145,7 +145,7 @@ func (app *App) execS3Select(ctx context.Context, reciever <-chan Path, queryStr
 	}
 
 	if err := eg.Wait(); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if info.IsCountMode {
