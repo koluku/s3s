@@ -140,8 +140,9 @@ func main() {
 	if err != nil {
 		if isDebug {
 			log.Fatalf("%+v\n", err)
+		} else {
+			log.Fatal(err)
 		}
-		log.Fatal(err)
 	}
 }
 
