@@ -4,13 +4,14 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/pkg/errors"
 )
 
 func (app *App) GetS3Bucket(ctx context.Context) ([]string, error) {
 	input := &s3.ListBucketsInput{}
 	output, err := app.s3.ListBuckets(ctx, input)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var s3keys = make([]string, len(output.Buckets))
