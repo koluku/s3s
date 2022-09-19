@@ -46,7 +46,7 @@ var (
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer stop()
 
 	app := &cli.App{
@@ -203,7 +203,17 @@ func cmd(ctx context.Context, paths []string) error {
 	default:
 		queryInfo.FormatType = s3s.FormatTypeJSON
 	}
-	app.Run(ctx, paths, queryStr, queryInfo)
+
+	if isDryRun {
+		scan_byte, count, err := app.DryRun(ctx, paths, queryStr, queryInfo)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		fmt.Printf("scan_byte: %d\n", scan_byte)
+		fmt.Printf("count: %d\n", count)
+	} else {
+		app.Run(ctx, paths, queryStr, queryInfo)
+	}
 
 	// Finalize
 	if isDelve {

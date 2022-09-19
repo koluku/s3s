@@ -34,12 +34,13 @@ func (app *App) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]s
 	return s3Keys, nil
 }
 
-type Path struct {
+type ObjectInfo struct {
 	Bucket string
 	Key    string
+	Size   int64
 }
 
-func (app *App) GetS3Keys(ctx context.Context, sender chan<- Path, bucket string, prefix string) error {
+func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket string, prefix string) error {
 	input := &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
@@ -53,9 +54,10 @@ func (app *App) GetS3Keys(ctx context.Context, sender chan<- Path, bucket string
 		}
 
 		for i := range output.Contents {
-			sender <- Path{
+			sender <- ObjectInfo{
 				Bucket: bucket,
 				Key:    *output.Contents[i].Key,
+				Size:   output.Contents[i].Size,
 			}
 		}
 	}
