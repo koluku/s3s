@@ -38,7 +38,7 @@ func NewApp(ctx context.Context, region string, maxRetries int, threadCount int)
 }
 
 func (app *App) Run(ctx context.Context, paths []string, queryStr string, queryInfo *QueryInfo) error {
-	ch := make(chan Path, app.threadCount)
+	ch := make(chan ObjectInfo, app.threadCount)
 	eg, egctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
@@ -61,7 +61,24 @@ func (app *App) Run(ctx context.Context, paths []string, queryStr string, queryI
 	return nil
 }
 
-func (app *App) getBucketKeys(ctx context.Context, ch chan<- Path, paths []string) error {
+func (app *App) DryRun(ctx context.Context, paths []string, queryStr string, queryInfo *QueryInfo) (int64, int, error) {
+	ch := make(chan ObjectInfo, app.threadCount)
+
+	if err := app.getBucketKeys(ctx, ch, paths); err != nil {
+		return 0, 0, errors.WithStack(err)
+	}
+
+	var scan_byte int64
+	var count int
+	for r := range ch {
+		scan_byte += r.Size
+		count++
+	}
+
+	return scan_byte, count, nil
+}
+
+func (app *App) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths []string) error {
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.SetLimit(app.threadCount)
 	for _, path := range paths {
@@ -91,7 +108,7 @@ func (app *App) getBucketKeys(ctx context.Context, ch chan<- Path, paths []strin
 	return nil
 }
 
-func (app *App) execS3Select(ctx context.Context, reciever <-chan Path, queryStr string, info *QueryInfo) error {
+func (app *App) execS3Select(ctx context.Context, reciever <-chan ObjectInfo, queryStr string, info *QueryInfo) error {
 	var count int
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.SetLimit(app.threadCount)

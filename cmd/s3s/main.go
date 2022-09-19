@@ -42,6 +42,7 @@ var (
 	maxRetries  int
 	isDelve     bool
 	isDebug     bool
+	isDryRun    bool
 )
 
 func main() {
@@ -126,6 +127,13 @@ func main() {
 				Usage:       "erorr check for developper",
 				Value:       false,
 				Destination: &isDebug,
+			},
+			&cli.BoolFlag{
+				Name:        "dry-run",
+				Aliases:     []string{"dry_run"},
+				Usage:       "",
+				Value:       false,
+				Destination: &isDryRun,
 			},
 		},
 		Action: func(c *cli.Context) error {
