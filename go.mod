@@ -3,10 +3,8 @@ module github.com/koluku/s3s
 go 1.17
 
 require (
-	github.com/aws/aws-sdk-go v1.44.101
 	github.com/aws/aws-sdk-go-v2 v1.16.15
 	github.com/aws/aws-sdk-go-v2/config v1.17.1
-	github.com/aws/aws-sdk-go-v2/service/pricing v1.17.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.27.5
 	github.com/dustin/go-humanize v1.0.0
 	github.com/ktr0731/go-fuzzyfinder v0.6.0
