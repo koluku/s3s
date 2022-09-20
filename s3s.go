@@ -64,7 +64,7 @@ func (app *App) Run(ctx context.Context, paths []string, queryStr string, queryI
 func (app *App) DryRun(ctx context.Context, paths []string, queryStr string, queryInfo *QueryInfo) (int64, int, error) {
 	ch := make(chan ObjectInfo, app.threadCount)
 
-	var scan_byte int64
+	var scanByte int64
 	var count int
 
 	eg, egctx := errgroup.WithContext(ctx)
@@ -76,7 +76,7 @@ func (app *App) DryRun(ctx context.Context, paths []string, queryStr string, que
 	})
 	eg.Go(func() error {
 		for r := range ch {
-			scan_byte += r.Size
+			scanByte += r.Size
 			count++
 		}
 		return nil
@@ -86,7 +86,7 @@ func (app *App) DryRun(ctx context.Context, paths []string, queryStr string, que
 		return 0, 0, errors.WithStack(err)
 	}
 
-	return scan_byte, count, nil
+	return scanByte, count, nil
 }
 
 func (app *App) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths []string) error {

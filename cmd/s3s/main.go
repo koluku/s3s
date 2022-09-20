@@ -132,7 +132,7 @@ func main() {
 			&cli.BoolFlag{
 				Name:        "dry-run",
 				Aliases:     []string{"dry_run"},
-				Usage:       "",
+				Usage:       "pre request for s3 select",
 				Value:       false,
 				Destination: &isDryRun,
 			},
@@ -206,11 +206,11 @@ func cmd(ctx context.Context, paths []string) error {
 	}
 
 	if isDryRun {
-		scan_byte, count, err := app.DryRun(ctx, paths, queryStr, queryInfo)
+		scanByte, count, err := app.DryRun(ctx, paths, queryStr, queryInfo)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		fmt.Printf("all scan_byte: %s\n", humanize.Bytes(uint64(scan_byte)))
+		fmt.Printf("all scan byte: %s\n", humanize.Bytes(uint64(scanByte)))
 		fmt.Printf("file count: %s\n", humanize.Comma(int64(count)))
 	} else {
 		app.Run(ctx, paths, queryStr, queryInfo)
