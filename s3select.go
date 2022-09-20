@@ -1,16 +1,17 @@
 package s3s
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 type Querying interface {
@@ -104,58 +105,84 @@ func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) (
 	stream := resp.GetStream()
 	defer stream.Close()
 
-	var result Result
-	for event := range stream.Events() {
-		record, ok := event.(*types.SelectObjectContentEventStreamMemberRecords)
-		if ok {
-			if info.IsCountMode {
-				var schema CountOnlySchema
-				if err := json.Unmarshal(record.Value.Payload, &schema); err != nil {
-					return nil, errors.WithStack(err)
+	pr, pw := io.Pipe()
+
+	eg, egctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		defer pw.Close()
+	LOOP:
+		for event := range stream.Events() {
+			select {
+			case <-egctx.Done():
+				break LOOP
+			default:
+				record, ok := event.(*types.SelectObjectContentEventStreamMemberRecords)
+				if ok {
+					pw.Write(record.Value.Payload)
 				}
-
-				result.Count += schema.Count
-				continue
-			}
-
-			if info.FormatType == FormatTypeALBLogs {
-				lines := bytes.Split(record.Value.Payload, []byte("\n"))
-				for _, line := range lines[:len(lines)-1] {
-					var schema ALBLogsSchema
-
-					if err := json.Unmarshal(line, &schema); err != nil {
-						return nil, errors.WithStack(err)
-					}
-
-					buf, err := json.Marshal(schema)
-					if err != nil {
-						return nil, errors.WithStack(err)
-					}
-					fmt.Println(string(buf))
-				}
-			} else if info.FormatType == FormatTypeCFLogs {
-				lines := bytes.Split(record.Value.Payload, []byte("\n"))
-				for _, line := range lines[:len(lines)-1] {
-					var schema CFLogsSchema
-
-					if err := json.Unmarshal(line, &schema); err != nil {
-						return nil, errors.WithStack(err)
-					}
-
-					buf, err := json.Marshal(schema)
-					if err != nil {
-						return nil, errors.WithStack(err)
-					}
-					fmt.Println(string(buf))
-				}
-			} else {
-				fmt.Print(string(record.Value.Payload))
 			}
 		}
+		return nil
+	})
+
+	var lines [][]byte
+	decoder := json.NewDecoder(pr)
+	for decoder.More() {
+		var v json.RawMessage
+		if err := decoder.Decode(&v); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		lines = append(lines, v)
 	}
 
-	if err := stream.Err(); err != nil {
+	if err := eg.Wait(); err != nil {
 		return nil, errors.WithStack(err)
+	}
+
+	var result Result
+	if info.IsCountMode {
+		var schema CountOnlySchema
+		if err := json.Unmarshal(lines[0], &schema); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		result.Count = schema.Count
+		return &result, errors.WithStack(err)
+	}
+
+	if info.FormatType == FormatTypeALBLogs {
+		for _, line := range lines {
+			var schema ALBLogsSchema
+			if err := json.Unmarshal(line, &schema); err != nil {
+				return nil, errors.WithStack(err)
+			}
+
+			buf, err := json.Marshal(schema)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			fmt.Println(string(buf))
+		}
+		result.Count = len(lines)
+	} else if info.FormatType == FormatTypeCFLogs {
+		for _, line := range lines {
+			var schema CFLogsSchema
+			if err := json.Unmarshal(line, &schema); err != nil {
+				return nil, errors.WithStack(err)
+			}
+
+			buf, err := json.Marshal(schema)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			fmt.Println(string(buf))
+		}
+		result.Count = len(lines)
+	} else {
+		for _, line := range lines {
+			fmt.Println(string(line))
+		}
+		result.Count = len(lines)
 	}
 
 	return &result, nil

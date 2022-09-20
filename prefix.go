@@ -23,6 +23,10 @@ func (app *App) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]s
 			return nil, errors.WithStack(err)
 		}
 
+		if len(output.CommonPrefixes) == 0 {
+			break
+		}
+
 		pageKeys := make([]string, len(output.CommonPrefixes))
 		for i := range output.CommonPrefixes {
 			pageKeys[i] = *output.CommonPrefixes[i].Prefix
