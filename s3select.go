@@ -141,12 +141,11 @@ func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) (
 	var result Result
 	if info.IsCountMode {
 		var schema CountOnlySchema
-		fmt.Printf("%s\n", lines[0])
 		if err := json.Unmarshal(lines[0], &schema); err != nil {
 			return nil, err
 		}
 
-		result.Count += schema.Count
+		result.Count = schema.Count
 		return &result, err
 	}
 
@@ -163,6 +162,7 @@ func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) (
 			}
 			fmt.Println(string(buf))
 		}
+		result.Count = len(lines)
 	} else if info.FormatType == FormatTypeCFLogs {
 		for _, line := range lines {
 			var schema CFLogsSchema
@@ -176,10 +176,12 @@ func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) (
 			}
 			fmt.Println(string(buf))
 		}
+		result.Count = len(lines)
 	} else {
 		for _, line := range lines {
-			fmt.Print(string(line))
+			fmt.Println(string(line))
 		}
+		result.Count = len(lines)
 	}
 
 	return &result, nil
