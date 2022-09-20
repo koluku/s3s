@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/dustin/go-humanize"
 	"github.com/koluku/s3s"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
@@ -209,8 +210,8 @@ func cmd(ctx context.Context, paths []string) error {
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		fmt.Printf("scan_byte: %d\n", scan_byte)
-		fmt.Printf("count: %d\n", count)
+		fmt.Printf("all scan_byte: %s\n", humanize.Bytes(uint64(scan_byte)))
+		fmt.Printf("file count: %s\n", humanize.Comma(int64(count)))
 	} else {
 		app.Run(ctx, paths, queryStr, queryInfo)
 	}
