@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/dustin/go-humanize"
 	"github.com/koluku/s3s"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
@@ -42,10 +43,11 @@ var (
 	maxRetries  int
 	isDelve     bool
 	isDebug     bool
+	isDryRun    bool
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer stop()
 
 	app := &cli.App{
@@ -127,6 +129,13 @@ func main() {
 				Value:       false,
 				Destination: &isDebug,
 			},
+			&cli.BoolFlag{
+				Name:        "dry-run",
+				Aliases:     []string{"dry_run"},
+				Usage:       "pre request for s3 select",
+				Value:       false,
+				Destination: &isDryRun,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if err := cmd(c.Context, c.Args().Slice()); err != nil {
@@ -195,7 +204,17 @@ func cmd(ctx context.Context, paths []string) error {
 	default:
 		queryInfo.FormatType = s3s.FormatTypeJSON
 	}
-	app.Run(ctx, paths, queryStr, queryInfo)
+
+	if isDryRun {
+		scanByte, count, err := app.DryRun(ctx, paths, queryStr, queryInfo)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		fmt.Printf("all scan byte: %s\n", humanize.Bytes(uint64(scanByte)))
+		fmt.Printf("file count: %s\n", humanize.Comma(int64(count)))
+	} else {
+		app.Run(ctx, paths, queryStr, queryInfo)
+	}
 
 	// Finalize
 	if isDelve {
