@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/dustin/go-humanize"
 	"github.com/koluku/s3s"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 )
 
@@ -40,10 +42,12 @@ var (
 	threadCount int
 	maxRetries  int
 	isDelve     bool
+	isDebug     bool
+	isDryRun    bool
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer stop()
 
 	app := &cli.App{
@@ -119,10 +123,23 @@ func main() {
 				Value:       false,
 				Destination: &isDelve,
 			},
+			&cli.BoolFlag{
+				Name:        "debug",
+				Usage:       "erorr check for developper",
+				Value:       false,
+				Destination: &isDebug,
+			},
+			&cli.BoolFlag{
+				Name:        "dry-run",
+				Aliases:     []string{"dry_run"},
+				Usage:       "pre request for s3 select",
+				Value:       false,
+				Destination: &isDryRun,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if err := cmd(c.Context, c.Args().Slice()); err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			return nil
 		},
@@ -130,32 +147,36 @@ func main() {
 
 	err := app.RunContext(ctx, os.Args)
 	if err != nil {
-		log.Fatal(err)
+		if isDebug {
+			log.Fatalf("%+v\n", err)
+		} else {
+			log.Fatal(err)
+		}
 	}
 }
 
 func cmd(ctx context.Context, paths []string) error {
 	// Arguments Check
 	if err := checkArgs(paths); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := checkQuery(queryStr, where, limit, isCount); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := checkFileFormat(isCSV, isALBLogs, isCFLogs); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// Initialize
 	app, err := s3s.NewApp(ctx, region, maxRetries, threadCount)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if isDelve {
 		newPaths, err := pathDelver(ctx, app, paths)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		paths = newPaths
 	}
@@ -183,7 +204,17 @@ func cmd(ctx context.Context, paths []string) error {
 	default:
 		queryInfo.FormatType = s3s.FormatTypeJSON
 	}
-	app.Run(ctx, paths, queryStr, queryInfo)
+
+	if isDryRun {
+		scanByte, count, err := app.DryRun(ctx, paths, queryStr, queryInfo)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		fmt.Printf("all scan byte: %s\n", humanize.Bytes(uint64(scanByte)))
+		fmt.Printf("file count: %s\n", humanize.Comma(int64(count)))
+	} else {
+		app.Run(ctx, paths, queryStr, queryInfo)
+	}
 
 	// Finalize
 	if isDelve {

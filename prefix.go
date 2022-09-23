@@ -5,6 +5,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/pkg/errors"
 )
 
 func (app *App) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]string, error) {
@@ -19,7 +20,7 @@ func (app *App) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]s
 	for pagenator.HasMorePages() {
 		output, err := pagenator.NextPage(ctx)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		if len(output.CommonPrefixes) == 0 {
@@ -37,37 +38,13 @@ func (app *App) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]s
 	return s3Keys, nil
 }
 
-func (app *App) GetS3Keys(ctx context.Context, bucket string, prefix string) ([]string, error) {
-	input := &s3.ListObjectsV2Input{
-		Bucket: aws.String(bucket),
-		Prefix: aws.String(prefix),
-	}
-	pagenator := s3.NewListObjectsV2Paginator(app.s3, input)
-
-	var s3Keys []string
-	for pagenator.HasMorePages() {
-		output, err := pagenator.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		pageKeys := make([]string, output.KeyCount)
-		for i := range output.Contents {
-			pageKeys[i] = *output.Contents[i].Key
-		}
-
-		s3Keys = append(s3Keys, pageKeys...)
-	}
-
-	return s3Keys, nil
-}
-
-type Path struct {
+type ObjectInfo struct {
 	Bucket string
 	Key    string
+	Size   int64
 }
 
-func (app *App) GetS3KeysWithChannel(ctx context.Context, sender chan<- Path, bucket string, prefix string) error {
+func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket string, prefix string) error {
 	input := &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
@@ -77,13 +54,14 @@ func (app *App) GetS3KeysWithChannel(ctx context.Context, sender chan<- Path, bu
 	for pagenator.HasMorePages() {
 		output, err := pagenator.NextPage(ctx)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		for i := range output.Contents {
-			sender <- Path{
+			sender <- ObjectInfo{
 				Bucket: bucket,
 				Key:    *output.Contents[i].Key,
+				Size:   output.Contents[i].Size,
 			}
 		}
 	}

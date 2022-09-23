@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -99,7 +100,7 @@ func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) (
 	params := input.toParameter()
 	resp, err := app.s3.SelectObjectContent(ctx, params)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	stream := resp.GetStream()
 	defer stream.Close()
@@ -129,36 +130,36 @@ func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) (
 	for decoder.More() {
 		var v json.RawMessage
 		if err := decoder.Decode(&v); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		lines = append(lines, v)
 	}
 
 	if err := eg.Wait(); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var result Result
 	if info.IsCountMode {
 		var schema CountOnlySchema
 		if err := json.Unmarshal(lines[0], &schema); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		result.Count = schema.Count
-		return &result, err
+		return &result, errors.WithStack(err)
 	}
 
 	if info.FormatType == FormatTypeALBLogs {
 		for _, line := range lines {
 			var schema ALBLogsSchema
 			if err := json.Unmarshal(line, &schema); err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 
 			buf, err := json.Marshal(schema)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			fmt.Println(string(buf))
 		}
@@ -167,12 +168,12 @@ func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) (
 		for _, line := range lines {
 			var schema CFLogsSchema
 			if err := json.Unmarshal(line, &schema); err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 
 			buf, err := json.Marshal(schema)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			fmt.Println(string(buf))
 		}
@@ -231,7 +232,7 @@ func (schema *ALBLogsSchema) UnmarshalJSON(b []byte) error {
 	raw := map[string]interface{}{}
 	err := json.Unmarshal(b, &raw)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	schema.Type = raw["_1"]
@@ -307,7 +308,7 @@ func (schema *CFLogsSchema) UnmarshalJSON(b []byte) error {
 	raw := map[string]interface{}{}
 	err := json.Unmarshal(b, &raw)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	schema.Date = raw["_1"]

@@ -1,17 +1,15 @@
 package main
 
-import (
-	"fmt"
-)
+import "github.com/pkg/errors"
 
 func checkArgs(paths []string) error {
 	if isDelve {
 		if len(paths) > 1 {
-			return fmt.Errorf("too many argument error")
+			return errors.Errorf("too many argument error")
 		}
 	} else {
 		if len(paths) == 0 {
-			return fmt.Errorf("no argument error")
+			return errors.Errorf("no argument error")
 		}
 	}
 
@@ -21,10 +19,10 @@ func checkArgs(paths []string) error {
 func checkQuery(queryStr string, where string, limit int, isCount bool) error {
 	if queryStr != "" {
 		if where != "" {
-			return fmt.Errorf("can't use query option with query option")
+			return errors.Errorf("can't use query option with query option")
 		}
 		if limit != 0 {
-			return fmt.Errorf("can't use query option with limit option")
+			return errors.Errorf("can't use query option with limit option")
 		}
 	}
 
@@ -40,7 +38,7 @@ func checkFileFormat(isCSV bool, isALBLogs bool, isCFLogs bool) error {
 	}
 
 	if count > 1 {
-		return fmt.Errorf("too many option: --csv, --alb-logs or --cf-logs")
+		return errors.Errorf("too many option: --csv, --alb-logs or --cf-logs")
 	}
 
 	return nil
