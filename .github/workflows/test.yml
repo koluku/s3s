@@ -1,5 +1,10 @@
 name: test
-on: [push, pull_request]
+
+on:
+  push:
+    branches:
+      - "*"
+
 jobs:
   go-versions:
     runs-on: ubuntu-latest
