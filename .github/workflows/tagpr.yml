@@ -15,7 +15,10 @@ jobs:
       with:
         app_id: ${{ secrets.APP_ID }}
         private_key: ${{ secrets.PRIVATE_KEY }}
-    - uses: actions/checkout@v3
+    - name: checkout
+      uses: actions/checkout@v3
+      with:
+        token: ${{ steps.generate_token.outputs.token }}
     - uses: Songmu/tagpr@v1
       env:
         GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
