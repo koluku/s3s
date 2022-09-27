@@ -40,6 +40,14 @@ func NewApp(ctx context.Context, region string, maxRetries int, threadCount int)
 }
 
 func (app *App) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) error {
+	cfPaths, err := app.OptimizateCFPaths(ctx, paths, keyInfo)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	if cfPaths != nil {
+		paths = cfPaths
+	}
+
 	ch := make(chan ObjectInfo, app.threadCount)
 	eg, egctx := errgroup.WithContext(ctx)
 

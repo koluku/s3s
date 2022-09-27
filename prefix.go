@@ -89,14 +89,15 @@ func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket 
 	}
 	pagenator := s3.NewListObjectsV2Paginator(app.s3, input)
 
-	switch info.KeyType {
-	case KeyTypeALB:
-		for pagenator.HasMorePages() {
-			output, err := pagenator.NextPage(ctx)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			for i := range output.Contents {
+	for pagenator.HasMorePages() {
+		output, err := pagenator.NextPage(ctx)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		for i := range output.Contents {
+			switch info.KeyType {
+			case KeyTypeALB:
 				if isTimeZeroRange(info.Since, info.Until) {
 					sender <- ObjectInfo{
 						Bucket: bucket,
@@ -105,6 +106,7 @@ func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket 
 					}
 					continue
 				}
+
 				isWithin, err := isTimeWithinWhenALB(*output.Contents[i].Key, info.Since, info.Until)
 				if err != nil {
 					return errors.WithStack(err)
@@ -117,15 +119,7 @@ func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket 
 					}
 					continue
 				}
-			}
-		}
-	default:
-		for pagenator.HasMorePages() {
-			output, err := pagenator.NextPage(ctx)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			for i := range output.Contents {
+			default:
 				sender <- ObjectInfo{
 					Bucket: bucket,
 					Key:    *output.Contents[i].Key,
