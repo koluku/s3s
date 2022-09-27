@@ -10,6 +10,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	ErrTimeParseFailed = "time parce failed"
+)
+
 func (app *App) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]string, error) {
 	input := &s3.ListObjectsV2Input{
 		Bucket:    aws.String(bucket),
@@ -144,7 +148,7 @@ func isTimeWithinWhenALB(key string, since time.Time, until time.Time) (bool, er
 
 	t, err := time.Parse("_20060102T1504Z_", timeStr)
 	if err != nil {
-		return false, errors.WithStack(err)
+		return false, errors.Wrap(err, ErrTimeParseFailed)
 	}
 
 	if !since.IsZero() && t.Before(since) {
