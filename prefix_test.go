@@ -6,7 +6,6 @@ import (
 )
 
 func TestIsTimeZeroRange(t *testing.T) {
-
 	cases := []struct {
 		name  string
 		since time.Time
@@ -50,8 +49,7 @@ func TestIsTimeZeroRange(t *testing.T) {
 	}
 }
 
-func TestIsTimeWithin(t *testing.T) {
-
+func TestIsTimeWithinWhenALB(t *testing.T) {
 	cases := []struct {
 		name  string
 		key   string
@@ -114,7 +112,7 @@ func TestIsTimeWithin(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := isTimeWithin(tt.key, tt.since, tt.until)
+			got := isTimeWithinWhenALB(tt.key, tt.since, tt.until)
 			if got != tt.want {
 				t.Errorf("want = %+v, but got = %+v", tt.want, got)
 			}

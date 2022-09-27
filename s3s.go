@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -66,6 +68,51 @@ func (app *App) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, qu
 
 	var scanByte int64
 	var count int
+
+	if keyInfo.KeyType == KeyTypeCF && !isTimeZeroRange(keyInfo.Since, keyInfo.Until) {
+		if !keyInfo.Since.IsZero() && keyInfo.Until.IsZero() {
+			return 0, 0, errors.WithStack(fmt.Errorf("since only will too many logs hit"))
+		}
+
+		var npaths []string
+		for _, path := range paths {
+			u, err := url.Parse(path)
+			if err != nil {
+				return 0, 0, errors.WithStack(err)
+			}
+			var bucket, prefix string
+			bucket = u.Hostname()
+			prefix = strings.TrimPrefix(u.Path, "/")
+			oi, err := app.GetS3OneKey(ctx, bucket, prefix)
+			if err != nil {
+				return 0, 0, errors.WithStack(err)
+			}
+
+			rep := regexp.MustCompile(`/?.+?\.`)
+			distribution := rep.FindString(oi.Key)
+			distribution = strings.TrimPrefix(distribution, "/")
+			paths = nil
+			t := keyInfo.Since
+			s := keyInfo.Until
+			if s.IsZero() {
+				s = time.Now()
+			}
+			for {
+				if t.After(s) {
+					break
+				}
+				abs := s.Sub(t)
+				if abs > time.Hour*24 {
+					npaths = append(npaths, fmt.Sprintf("s3://%s/%s%s", oi.Bucket, distribution, t.Format("2006-01-02")))
+					t = t.Add(time.Hour * 24)
+				} else {
+					npaths = append(npaths, fmt.Sprintf("s3://%s/%s%s", oi.Bucket, distribution, t.Format("2006-01-02-15.")))
+					t = t.Add(time.Hour)
+				}
+			}
+		}
+		paths = npaths
+	}
 
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
