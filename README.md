@@ -24,7 +24,7 @@ USAGE:
    s3s [global options] command [command options] [arguments...]
 
 VERSION:
-   v0.3.0
+   v0.4.0
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
@@ -34,13 +34,18 @@ GLOBAL OPTIONS:
    --cf-logs, --cf_logs            (default: false)
    --count, -c                     max number of results from each key to return (default: false)
    --csv                           (default: false)
+   --debug                         erorr check for developper (default: false)
    --delve                         like directory move before querying (default: false)
+   --dry-run, --dry_run            pre request for s3 select (default: false)
+   --duration value                from current time if alb or cf (ex: "2h3m") (default: 0s)
    --help, -h                      show help (default: false)
    --limit value, -l value         max number of results from each key to return (default: 0)
    --max-retries value, -M value   max number of api requests to retry (default: 20)
    --query value, -q value         a query for S3 Select
    --region value                  region of target s3 bucket exist (default: ENV["AWS_REGION"])
+   --since value                   end at if alb or cf (ex: "2006-01-02 15:04:05")
    --thread-count value, -t value  max number of api requests to concurrently (default: 150)
+   --until value                   start at if alb or cf (ex: "2006-01-02 15:04:05")
    --version, -v                   print the version (default: false)
    --where value, -w value         WHERE part of the query
 ```
@@ -73,7 +78,10 @@ $ s3s s3://bucket/prefix
 
 ### ALB and CF logs support
 
-`--alb-logs` or `--cf-logs` option is tagging available instead of `_1`, `_2`, etc.
+`--alb-logs` is a format for Application Load Balancer (ALB).
+`--cf-logs` is a format for CloudFront (CF).
+
+Each options are tagging available instead of `_1`, `_2`, etc.
 
 - [Application Load Balancer Format](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html)
 - [CloudFront Format](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/AccessLogs.html)
@@ -120,6 +128,15 @@ $ s3s --alb-logs --where="s.`time` = '2022-09-01T00:00:00.000000Z'" s3://prefix
 |_30||sc-content-type|
 |_31||sc-range-start|
 |_32||sc-range-end|
+
+Support log range when alb and cf.
+time format is `2006-01-02 15:04:05` as UTC.
+
+- `--duration` is a duration from now.
+- `--since` is start time
+- `--until` is end time
+
+However, s3s stop when you target cloudfront and using `--duration` or `--since` only, because s3s hit too many keys.
 
 ### `-delve`, like directory move before querying
 
