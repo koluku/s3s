@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/koluku/s3s"
@@ -37,6 +38,12 @@ var (
 	isCSV     bool
 	isALBLogs bool
 	isCFLogs  bool
+
+	duration time.Duration
+	since    time.Time
+	cliSince cli.Timestamp
+	until    time.Time
+	cliUntil cli.Timestamp
 
 	// command option
 	threadCount int
@@ -103,6 +110,25 @@ func main() {
 				Usage:       "",
 				Destination: &isCFLogs,
 			},
+			&cli.DurationFlag{
+				Name:        "duration",
+				Usage:       `from current time if alb or cf (ex: "2h3m")`,
+				Destination: &duration,
+			},
+			&cli.TimestampFlag{
+				Name:        "since",
+				Usage:       `end at if alb or cf (ex: "2006-01-02 15:04:05")`,
+				Layout:      "2006-01-02 15:04:05",
+				Timezone:    time.UTC,
+				Destination: &cliSince,
+			},
+			&cli.TimestampFlag{
+				Name:        "until",
+				Usage:       `start at if alb or cf (ex: "2006-01-02 15:04:05")`,
+				Layout:      "2006-01-02 15:04:05",
+				Timezone:    time.UTC,
+				Destination: &cliUntil,
+			},
 			&cli.IntFlag{
 				Name:        "thread-count",
 				Aliases:     []string{"t, thread_count"},
@@ -138,6 +164,13 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			if cliSince.Value() != nil {
+				since = *cliSince.Value()
+			}
+			if cliUntil.Value() != nil {
+				until = *cliUntil.Value()
+			}
+
 			if err := cmd(c.Context, c.Args().Slice()); err != nil {
 				return errors.WithStack(err)
 			}
@@ -188,6 +221,9 @@ func cmd(ctx context.Context, paths []string) error {
 	queryInfo := &s3s.QueryInfo{
 		IsCountMode: isCount,
 	}
+	keyInfo := &s3s.KeyInfo{
+		KeyType: s3s.KeyTypeNone,
+	}
 	switch {
 	case isCSV:
 		queryInfo.FormatType = s3s.FormatTypeCSV
@@ -197,23 +233,39 @@ func cmd(ctx context.Context, paths []string) error {
 		queryInfo.FormatType = s3s.FormatTypeALBLogs
 		queryInfo.FieldDelimiter = " "
 		queryInfo.RecordDelimiter = "\n"
+		keyInfo.KeyType = s3s.KeyTypeALB
+		if duration != 0 {
+			keyInfo.Since = time.Now().UTC().Add(duration * -1)
+		} else {
+			keyInfo.Since = since
+			keyInfo.Until = until
+		}
 	case isCFLogs:
 		queryInfo.FormatType = s3s.FormatTypeCFLogs
 		queryInfo.FieldDelimiter = "\t"
 		queryInfo.RecordDelimiter = "\n"
+		keyInfo.KeyType = s3s.KeyTypeCF
+		if duration != 0 {
+			keyInfo.Since = time.Now().UTC().Add(duration * -1)
+		} else {
+			keyInfo.Since = since
+			keyInfo.Until = until
+		}
 	default:
 		queryInfo.FormatType = s3s.FormatTypeJSON
 	}
 
 	if isDryRun {
-		scanByte, count, err := app.DryRun(ctx, paths, queryStr, queryInfo)
+		scanByte, count, err := app.DryRun(ctx, paths, keyInfo, queryStr, queryInfo)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		fmt.Printf("all scan byte: %s\n", humanize.Bytes(uint64(scanByte)))
 		fmt.Printf("file count: %s\n", humanize.Comma(int64(count)))
 	} else {
-		app.Run(ctx, paths, queryStr, queryInfo)
+		if err := app.Run(ctx, paths, keyInfo, queryStr, queryInfo); err != nil {
+			return errors.WithStack(err)
+		}
 	}
 
 	// Finalize
