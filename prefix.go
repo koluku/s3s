@@ -2,7 +2,6 @@ package s3s
 
 import (
 	"context"
-	"log"
 	"regexp"
 	"time"
 
@@ -102,7 +101,11 @@ func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket 
 					}
 					continue
 				}
-				if isTimeWithinWhenALB(*output.Contents[i].Key, info.Since, info.Until) {
+				isWithin, err := isTimeWithinWhenALB(*output.Contents[i].Key, info.Since, info.Until)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+				if isWithin {
 					sender <- ObjectInfo{
 						Bucket: bucket,
 						Key:    *output.Contents[i].Key,
@@ -135,20 +138,20 @@ func isTimeZeroRange(since time.Time, until time.Time) bool {
 	return since.IsZero() && until.IsZero()
 }
 
-func isTimeWithinWhenALB(key string, since time.Time, until time.Time) bool {
+func isTimeWithinWhenALB(key string, since time.Time, until time.Time) (bool, error) {
 	rep := regexp.MustCompile(`_\d{8}T\d{4}Z_`)
 	timeStr := rep.FindString(key)
 
 	t, err := time.Parse("_20060102T1504Z_", timeStr)
 	if err != nil {
-		log.Fatalf("%+v\n%+v\n%+v\n", key, timeStr, err)
+		return false, errors.WithStack(err)
 	}
 
 	if !since.IsZero() && t.Before(since) {
-		return false
+		return false, nil
 	}
 	if !until.IsZero() && t.After(until) {
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }
