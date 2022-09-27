@@ -260,7 +260,6 @@ func cmd(ctx context.Context, paths []string) error {
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		fmt.Printf("%+v\n", keyInfo)
 		fmt.Printf("all scan byte: %s\n", humanize.Bytes(uint64(scanByte)))
 		fmt.Printf("file count: %s\n", humanize.Comma(int64(count)))
 	} else {
