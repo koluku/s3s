@@ -183,7 +183,7 @@ func cmd(ctx context.Context, paths []string) error {
 
 	// Execution
 	if queryStr == "" {
-		queryStr = buildQuery(where, limit, isCount)
+		queryStr = buildQuery(where, limit, isCount, isALBLogs, isCFLogs)
 	}
 	queryInfo := &s3s.QueryInfo{
 		IsCountMode: isCount,
