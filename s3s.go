@@ -37,12 +37,12 @@ func NewApp(ctx context.Context, region string, maxRetries int, threadCount int)
 	return app, nil
 }
 
-func (app *App) Run(ctx context.Context, paths []string, queryStr string, queryInfo *QueryInfo) error {
+func (app *App) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) error {
 	ch := make(chan ObjectInfo, app.threadCount)
 	eg, egctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		if err := app.getBucketKeys(egctx, ch, paths); err != nil {
+		if err := app.getBucketKeys(egctx, ch, paths, keyInfo); err != nil {
 			return errors.WithStack(err)
 		}
 		return nil
@@ -61,7 +61,7 @@ func (app *App) Run(ctx context.Context, paths []string, queryStr string, queryI
 	return nil
 }
 
-func (app *App) DryRun(ctx context.Context, paths []string, queryStr string, queryInfo *QueryInfo) (int64, int, error) {
+func (app *App) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) (int64, int, error) {
 	ch := make(chan ObjectInfo, app.threadCount)
 
 	var scanByte int64
@@ -69,7 +69,7 @@ func (app *App) DryRun(ctx context.Context, paths []string, queryStr string, que
 
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		if err := app.getBucketKeys(egctx, ch, paths); err != nil {
+		if err := app.getBucketKeys(egctx, ch, paths, keyInfo); err != nil {
 			return errors.WithStack(err)
 		}
 		return nil
@@ -89,7 +89,7 @@ func (app *App) DryRun(ctx context.Context, paths []string, queryStr string, que
 	return scanByte, count, nil
 }
 
-func (app *App) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths []string) error {
+func (app *App) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths []string, info *KeyInfo) error {
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.SetLimit(app.threadCount)
 	for _, path := range paths {
@@ -103,7 +103,7 @@ func (app *App) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths [
 			bucket = u.Hostname()
 			prefix = strings.TrimPrefix(u.Path, "/")
 
-			if app.GetS3Keys(egctx, ch, bucket, prefix); err != nil {
+			if app.GetS3Keys(egctx, ch, bucket, prefix, info); err != nil {
 				return errors.WithStack(err)
 			}
 			return nil

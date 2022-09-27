@@ -2,6 +2,9 @@ package s3s
 
 import (
 	"context"
+	"log"
+	"regexp"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -38,13 +41,27 @@ func (app *App) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]s
 	return s3Keys, nil
 }
 
+type KeyType int
+
+const (
+	KeyTypeNone KeyType = iota
+	KeyTypeALB
+	KeyTypeCF
+)
+
+type KeyInfo struct {
+	KeyType KeyType
+	Since   time.Time
+	Until   time.Time
+}
+
 type ObjectInfo struct {
 	Bucket string
 	Key    string
 	Size   int64
 }
 
-func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket string, prefix string) error {
+func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket string, prefix string, info *KeyInfo) error {
 	input := &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
@@ -58,13 +75,56 @@ func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket 
 		}
 
 		for i := range output.Contents {
-			sender <- ObjectInfo{
-				Bucket: bucket,
-				Key:    *output.Contents[i].Key,
-				Size:   output.Contents[i].Size,
+			switch info.KeyType {
+			case KeyTypeNone:
+				sender <- ObjectInfo{
+					Bucket: bucket,
+					Key:    *output.Contents[i].Key,
+					Size:   output.Contents[i].Size,
+				}
+			case KeyTypeALB:
+				if isTimeZeroRange(info.Since, info.Until) {
+					sender <- ObjectInfo{
+						Bucket: bucket,
+						Key:    *output.Contents[i].Key,
+						Size:   output.Contents[i].Size,
+					}
+					continue
+				}
+				if isTimeWithin(*output.Contents[i].Key, info.Since, info.Until) {
+					sender <- ObjectInfo{
+						Bucket: bucket,
+						Key:    *output.Contents[i].Key,
+						Size:   output.Contents[i].Size,
+					}
+					continue
+				}
+			case KeyTypeCF:
 			}
 		}
 	}
 
 	return nil
+}
+
+func isTimeZeroRange(since time.Time, until time.Time) bool {
+	return since.IsZero() && until.IsZero()
+}
+
+func isTimeWithin(key string, since time.Time, until time.Time) bool {
+	rep := regexp.MustCompile(`_\d{8}T\d{4}Z_`)
+	timeStr := rep.FindString(key)
+
+	t, err := time.Parse("_20060102T1504Z_", timeStr)
+	if err != nil {
+		log.Fatalf("%+v\n%+v\n%+v\n", key, timeStr, err)
+	}
+
+	if !since.IsZero() && t.Before(since) {
+		return false
+	}
+	if !until.IsZero() && t.After(until) {
+		return false
+	}
+	return true
 }
