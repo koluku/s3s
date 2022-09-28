@@ -27,7 +27,7 @@ func BuildQuery(where string, limit int, isCount bool) string {
 	return query
 }
 
-var albLogsWhereMap = map[string]string{
+var AlbLogsWhereMap = map[string]string{
 	"type":                     "_1",
 	"time":                     "_2",
 	"elb":                      "_3",
@@ -62,7 +62,7 @@ var albLogsWhereMap = map[string]string{
 func BuildQueryForALB(where string, limit int, isCount bool) string {
 	query := BuildQuery(where, limit, isCount)
 
-	for k, v := range albLogsWhereMap {
+	for k, v := range AlbLogsWhereMap {
 		rep := regexp.MustCompile(` (s\.)?` + "`?" + k + "`" + `? `)
 		query = rep.ReplaceAllString(query, " s."+v+" ")
 	}
