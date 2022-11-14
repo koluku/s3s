@@ -9,7 +9,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/ktr0731/go-fuzzyfinder v0.6.0
 	github.com/pkg/errors v0.9.1
-	github.com/urfave/cli/v2 v2.11.2
+	github.com/urfave/cli/v2 v2.23.5
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 )
 
