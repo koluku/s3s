@@ -26,6 +26,9 @@ var (
 	// goreleaser
 	Version = "current"
 
+	// AWS
+	region string
+
 	// S3 Select Query
 	queryStr string
 	where    string
@@ -59,6 +62,13 @@ func main() {
 		Version: Version,
 		Usage:   "Easy S3 select like searching in directories",
 		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "region",
+				Usage:       "region of target s3 bucket exist",
+				Value:       os.Getenv("AWS_REGION"),
+				DefaultText: "ENV[\"AWS_REGION\"]",
+				Destination: &region,
+			},
 			&cli.StringFlag{
 				Name:        "query",
 				Aliases:     []string{"q"},
@@ -191,7 +201,7 @@ func cmd(ctx context.Context, paths []string) error {
 	}
 
 	// Initialize
-	app, err := s3s.NewApp(ctx, maxRetries, threadCount)
+	app, err := s3s.NewApp(ctx, region, maxRetries, threadCount)
 	if err != nil {
 		return errors.WithStack(err)
 	}
