@@ -20,8 +20,8 @@ type App struct {
 	s3          *s3.Client
 }
 
-func NewApp(ctx context.Context, region string, maxRetries int, threadCount int) (*App, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+func NewApp(ctx context.Context, maxRetries int, threadCount int) (*App, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
