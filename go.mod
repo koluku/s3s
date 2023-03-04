@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.17.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.27.5
 	github.com/dustin/go-humanize v1.0.0
-	github.com/ktr0731/go-fuzzyfinder v0.6.0
+	github.com/ktr0731/go-fuzzyfinder v0.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/urfave/cli/v2 v2.11.2
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
@@ -30,14 +30,15 @@ require (
 	github.com/aws/smithy-go v1.13.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
-	github.com/gdamore/tcell/v2 v2.4.0 // indirect
-	github.com/lucasb-eyer/go-colorful v1.0.3 // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
-	github.com/nsf/termbox-go v0.0.0-20201124104050-ed494de23a00 // indirect
-	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/gdamore/tcell/v2 v2.5.3 // indirect
+	github.com/ktr0731/go-ansisgr v0.1.0 // indirect
+	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/nsf/termbox-go v1.1.1 // indirect
+	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
-	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
-	golang.org/x/text v0.3.8 // indirect
+	golang.org/x/sys v0.1.0 // indirect
+	golang.org/x/term v0.1.0 // indirect
+	golang.org/x/text v0.4.0 // indirect
 )
