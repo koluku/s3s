@@ -10,7 +10,7 @@ require (
 	github.com/ktr0731/go-fuzzyfinder v0.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/urfave/cli/v2 v2.11.2
-	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
+	golang.org/x/sync v0.1.0
 )
 
 require (
