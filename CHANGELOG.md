@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.4.1](https://github.com/koluku/s3s/compare/v0.4.0...v0.4.1) - 2023-03-04
+- remove region option by @koluku in https://github.com/koluku/s3s/pull/74
+- Revert "remove region option" by @koluku in https://github.com/koluku/s3s/pull/76
+- remove dependabot by @koluku in https://github.com/koluku/s3s/pull/80
+- Bump golang.org/x/text from 0.3.7 to 0.3.8 by @dependabot in https://github.com/koluku/s3s/pull/81
+- Bump github.com/ktr0731/go-fuzzyfinder from 0.6.0 to 0.7.0 by @dependabot in https://github.com/koluku/s3s/pull/83
+- Bump github.com/aws/aws-sdk-go-v2 from 1.16.15 to 1.17.5 by @dependabot in https://github.com/koluku/s3s/pull/84
+- Bump golang.org/x/sync from 0.0.0-20220819030929-7fc1605a5dde to 0.1.0 by @dependabot in https://github.com/koluku/s3s/pull/85
+- Bump github.com/urfave/cli/v2 from 2.11.2 to 2.24.4 by @dependabot in https://github.com/koluku/s3s/pull/86
+- Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.27.5 to 1.30.5 by @dependabot in https://github.com/koluku/s3s/pull/87
+
 ## [v0.4.0](https://github.com/koluku/s3s/compare/v0.3.3...v0.4.0) - 2022-09-27
 - add debug option by @koluku in https://github.com/koluku/s3s/pull/36
 - add dry run by @koluku in https://github.com/koluku/s3s/pull/39
