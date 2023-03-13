@@ -4,6 +4,12 @@
 - Upgrade Go version to 1.19 by @koluku in https://github.com/koluku/s3s/pull/91
 - categorize global options by @koluku in https://github.com/koluku/s3s/pull/93
 - Fix time options when targeting ALB logs by @koluku in https://github.com/koluku/s3s/pull/94
+- Update release action by @koluku in https://github.com/koluku/s3s/pull/95
+
+## [v0.4.2](https://github.com/koluku/s3s/compare/v0.4.1...v0.4.2) - 2023-03-13
+- Upgrade Go version to 1.19 by @koluku in https://github.com/koluku/s3s/pull/91
+- categorize global options by @koluku in https://github.com/koluku/s3s/pull/93
+- Fix time options when targeting ALB logs by @koluku in https://github.com/koluku/s3s/pull/94
 
 ## [v0.4.1](https://github.com/koluku/s3s/compare/v0.4.0...v0.4.1) - 2023-03-04
 - remove region option by @koluku in https://github.com/koluku/s3s/pull/74
