@@ -1,6 +1,10 @@
 package main
 
-import "github.com/pkg/errors"
+import (
+	"time"
+
+	"github.com/pkg/errors"
+)
 
 func checkArgs(paths []string) error {
 	if isDelve {
@@ -11,6 +15,20 @@ func checkArgs(paths []string) error {
 		if len(paths) == 0 {
 			return errors.Errorf("no argument error")
 		}
+	}
+
+	return nil
+}
+
+func checkTime(duration time.Duration, until, since time.Time) error {
+	if duration < 0 {
+		return errors.Errorf("minus duration error")
+	}
+	if duration > 0 && (!until.IsZero() || !since.IsZero()) {
+		return errors.Errorf("duration with since/until error")
+	}
+	if !until.IsZero() && !since.IsZero() && !since.Before(until) {
+		return errors.Errorf("since >= until error")
 	}
 
 	return nil

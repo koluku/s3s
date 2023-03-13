@@ -135,13 +135,13 @@ func main() {
 				Destination: &isCFLogs,
 			},
 			&cli.DurationFlag{
-				Category:    "Target:",
+				Category:    "Time:",
 				Name:        "duration",
 				Usage:       `from current time if alb or cf (ex: "2h3m")`,
 				Destination: &duration,
 			},
 			&cli.TimestampFlag{
-				Category:    "Target:",
+				Category:    "Time:",
 				Name:        "since",
 				Usage:       `end at if alb or cf (ex: "2006-01-02 15:04:05")`,
 				Layout:      "2006-01-02 15:04:05",
@@ -149,7 +149,7 @@ func main() {
 				Destination: &cliSince,
 			},
 			&cli.TimestampFlag{
-				Category:    "Target:",
+				Category:    "Time:",
 				Name:        "until",
 				Usage:       `start at if alb or cf (ex: "2006-01-02 15:04:05")`,
 				Layout:      "2006-01-02 15:04:05",
@@ -204,8 +204,11 @@ func main() {
 }
 
 func cmd(ctx context.Context, paths []string) error {
-	// Arguments Check
+	// Arguments and Options Check
 	if err := checkArgs(paths); err != nil {
+		return errors.WithStack(err)
+	}
+	if err := checkTime(duration, until, since); err != nil {
 		return errors.WithStack(err)
 	}
 	if err := checkQuery(queryStr, where, limit, isCount); err != nil {
@@ -248,9 +251,11 @@ func cmd(ctx context.Context, paths []string) error {
 		queryInfo.FormatType = s3s.FormatTypeALBLogs
 		queryInfo.FieldDelimiter = " "
 		queryInfo.RecordDelimiter = "\n"
+
 		keyInfo.KeyType = s3s.KeyTypeALB
-		if duration != 0 {
-			keyInfo.Since = time.Now().UTC().Add(duration * -1)
+		if duration > 0 {
+			keyInfo.Since = time.Now().UTC().Add(-duration)
+			keyInfo.Until = time.Now().UTC()
 		} else {
 			keyInfo.Since = since
 			keyInfo.Until = until
@@ -259,9 +264,11 @@ func cmd(ctx context.Context, paths []string) error {
 		queryInfo.FormatType = s3s.FormatTypeCFLogs
 		queryInfo.FieldDelimiter = "\t"
 		queryInfo.RecordDelimiter = "\n"
+
 		keyInfo.KeyType = s3s.KeyTypeCF
-		if duration != 0 {
-			keyInfo.Since = time.Now().UTC().Add(duration * -1)
+		if duration > 0 {
+			keyInfo.Since = time.Now().UTC().Add(-duration)
+			keyInfo.Until = time.Now().UTC()
 		} else {
 			keyInfo.Since = since
 			keyInfo.Until = until

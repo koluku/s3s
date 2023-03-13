@@ -2,16 +2,11 @@ package s3s
 
 import (
 	"context"
-	"regexp"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/pkg/errors"
-)
-
-const (
-	ErrTimeParseFailed = "time parce failed"
 )
 
 func (app *App) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]string, error) {
@@ -107,11 +102,11 @@ func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket 
 					continue
 				}
 
-				isWithin, err := isTimeWithinWhenALB(*output.Contents[i].Key, info.Since, info.Until)
+				endTime, err := getALBKeyEndTime(*output.Contents[i].Key)
 				if err != nil {
 					return errors.WithStack(err)
 				}
-				if isWithin {
+				if isTimeWithin(endTime, info.Since, info.Until) {
 					sender <- ObjectInfo{
 						Bucket: bucket,
 						Key:    *output.Contents[i].Key,
@@ -130,26 +125,4 @@ func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket 
 	}
 
 	return nil
-}
-
-func isTimeZeroRange(since time.Time, until time.Time) bool {
-	return since.IsZero() && until.IsZero()
-}
-
-func isTimeWithinWhenALB(key string, since time.Time, until time.Time) (bool, error) {
-	rep := regexp.MustCompile(`_\d{8}T\d{4}Z_`)
-	timeStr := rep.FindString(key)
-
-	t, err := time.Parse("_20060102T1504Z_", timeStr)
-	if err != nil {
-		return false, errors.Wrap(err, ErrTimeParseFailed)
-	}
-
-	if !since.IsZero() && t.Before(since) {
-		return false, nil
-	}
-	if !until.IsZero() && t.After(until) {
-		return false, nil
-	}
-	return true, nil
 }
