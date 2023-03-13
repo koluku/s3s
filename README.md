@@ -24,30 +24,45 @@ USAGE:
    s3s [global options] command [command options] [arguments...]
 
 VERSION:
-   v0.4.0
+   current
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --alb-logs, --alb_logs          (default: false)
-   --cf-logs, --cf_logs            (default: false)
-   --count, -c                     max number of results from each key to return (default: false)
-   --csv                           (default: false)
-   --debug                         erorr check for developper (default: false)
-   --delve                         like directory move before querying (default: false)
-   --dry-run, --dry_run            pre request for s3 select (default: false)
-   --duration value                from current time if alb or cf (ex: "2h3m") (default: 0s)
-   --help, -h                      show help (default: false)
-   --limit value, -l value         max number of results from each key to return (default: 0)
+   --debug        erorr check for developer (default: false)
+   --help, -h     show help
+   --version, -v  print the version
+
+   AWS:
+
    --max-retries value, -M value   max number of api requests to retry (default: 20)
-   --query value, -q value         a query for S3 Select
    --region value                  region of target s3 bucket exist (default: ENV["AWS_REGION"])
-   --since value                   end at if alb or cf (ex: "2006-01-02 15:04:05")
    --thread-count value, -t value  max number of api requests to concurrently (default: 150)
-   --until value                   start at if alb or cf (ex: "2006-01-02 15:04:05")
-   --version, -v                   print the version (default: false)
-   --where value, -w value         WHERE part of the query
+
+   Input Format:
+
+   --alb-logs, --alb_logs  (default: false)
+   --cf-logs, --cf_logs    (default: false)
+   --csv                   (default: false)
+
+   Query:
+
+   --count, -c              max number of results from each key to return (default: false)
+   --limit value, -l value  max number of results from each key to return (default: 0)
+   --query value, -q value  a query for S3 Select
+   --where value, -w value  WHERE part of the query
+
+   Run:
+
+   --delve               like directory move before querying (default: false)
+   --dry-run, --dry_run  pre request for s3 select (default: false)
+
+   Target:
+
+   --duration value  from current time if alb or cf (ex: "2h3m") (default: 0s)
+   --since value     end at if alb or cf (ex: "2006-01-02 15:04:05")
+   --until value     start at if alb or cf (ex: "2006-01-02 15:04:05")
 ```
 
 s3s is execution S3 Select from json to json (default).
