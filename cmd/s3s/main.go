@@ -208,8 +208,10 @@ func cmd(ctx context.Context, paths []string) error {
 	if err := checkArgs(paths); err != nil {
 		return errors.WithStack(err)
 	}
-	if err := checkTime(duration, until, since); err != nil {
-		return errors.WithStack(err)
+	if isALBLogs || isCFLogs {
+		if err := checkTime(duration, until, since); err != nil {
+			return errors.WithStack(err)
+		}
 	}
 	if err := checkQuery(queryStr, where, limit, isCount); err != nil {
 		return errors.WithStack(err)
