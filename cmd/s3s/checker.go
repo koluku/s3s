@@ -27,6 +27,12 @@ func checkTime(duration time.Duration, until, since time.Time) error {
 	if duration > 0 && (!until.IsZero() || !since.IsZero()) {
 		return errors.Errorf("duration with since/until error")
 	}
+	if !since.IsZero() && until.IsZero() {
+		return errors.Errorf("since only will too many logs hit")
+	}
+	if since.IsZero() && !until.IsZero() {
+		return errors.Errorf("until only will too many logs hit")
+	}
 	if !until.IsZero() && !since.IsZero() && !since.Before(until) {
 		return errors.Errorf("since >= until error")
 	}
