@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -40,12 +38,23 @@ func NewApp(ctx context.Context, region string, maxRetries int, threadCount int)
 }
 
 func (app *App) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) error {
-	cfPaths, err := app.OptimizateCFPaths(ctx, paths, keyInfo)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	if cfPaths != nil {
-		paths = cfPaths
+	switch keyInfo.KeyType {
+	case KeyTypeALB:
+		albPaths, err := app.OptimizateALBPaths(ctx, paths, keyInfo)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if albPaths != nil {
+			paths = albPaths
+		}
+	case KeyTypeCF:
+		cfPaths, err := app.OptimizateCFPaths(ctx, paths, keyInfo)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if cfPaths != nil {
+			paths = cfPaths
+		}
 	}
 
 	ch := make(chan ObjectInfo, app.threadCount)
@@ -72,12 +81,23 @@ func (app *App) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, query
 }
 
 func (app *App) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) (int64, int, error) {
-	cfPaths, err := app.OptimizateCFPaths(ctx, paths, keyInfo)
-	if err != nil {
-		return 0, 0, errors.WithStack(err)
-	}
-	if cfPaths != nil {
-		paths = cfPaths
+	switch keyInfo.KeyType {
+	case KeyTypeALB:
+		albPaths, err := app.OptimizateALBPaths(ctx, paths, keyInfo)
+		if err != nil {
+			return 0, 0, errors.WithStack(err)
+		}
+		if albPaths != nil {
+			paths = albPaths
+		}
+	case KeyTypeCF:
+		cfPaths, err := app.OptimizateCFPaths(ctx, paths, keyInfo)
+		if err != nil {
+			return 0, 0, errors.WithStack(err)
+		}
+		if cfPaths != nil {
+			paths = cfPaths
+		}
 	}
 
 	var scanByte int64
@@ -104,56 +124,6 @@ func (app *App) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, qu
 	}
 
 	return scanByte, count, nil
-}
-
-func (app *App) OptimizateCFPaths(ctx context.Context, paths []string, keyInfo *KeyInfo) ([]string, error) {
-	if keyInfo.KeyType != KeyTypeCF || isTimeZeroRange(keyInfo.Since, keyInfo.Until) {
-		return nil, nil
-	}
-
-	if !keyInfo.Since.IsZero() && keyInfo.Until.IsZero() {
-		return nil, errors.WithStack(fmt.Errorf("since only will too many logs hit"))
-	}
-
-	var npaths []string
-	for _, path := range paths {
-		u, err := url.Parse(path)
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-		var bucket, prefix string
-		bucket = u.Hostname()
-		prefix = strings.TrimPrefix(u.Path, "/")
-		oi, err := app.GetS3OneKey(ctx, bucket, prefix)
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-
-		rep := regexp.MustCompile(`/?.+?\.`)
-		distribution := rep.FindString(oi.Key)
-		distribution = strings.TrimPrefix(distribution, "/")
-		paths = nil
-		t := keyInfo.Since
-		s := keyInfo.Until
-		if s.IsZero() {
-			s = time.Now()
-		}
-		for {
-			if t.After(s) {
-				break
-			}
-			abs := s.Sub(t)
-			if abs > time.Hour*24 {
-				npaths = append(npaths, fmt.Sprintf("s3://%s/%s%s", oi.Bucket, distribution, t.Format("2006-01-02")))
-				t = t.Add(time.Hour * 24)
-			} else {
-				npaths = append(npaths, fmt.Sprintf("s3://%s/%s%s", oi.Bucket, distribution, t.Format("2006-01-02-15.")))
-				t = t.Add(time.Hour)
-			}
-		}
-	}
-
-	return npaths, nil
 }
 
 func (app *App) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths []string, info *KeyInfo) error {
