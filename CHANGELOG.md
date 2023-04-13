@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.4.3](https://github.com/koluku/s3s/compare/v0.4.2...v0.4.3) - 2023-04-13
+- Bump github.com/urfave/cli/v2 from 2.25.0 to 2.25.1 by @dependabot in https://github.com/koluku/s3s/pull/103
+- Bump github.com/aws/aws-sdk-go-v2 from 1.17.5 to 1.17.7 by @dependabot in https://github.com/koluku/s3s/pull/104
+- Bump github.com/aws/aws-sdk-go-v2/config from 1.18.15 to 1.18.20 by @dependabot in https://github.com/koluku/s3s/pull/107
+- Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.30.5 to 1.31.2 by @dependabot in https://github.com/koluku/s3s/pull/108
+- Fix time options for ALB logs by @koluku in https://github.com/koluku/s3s/pull/111
+
 ## [v0.4.2](https://github.com/koluku/s3s/compare/v0.4.1...v0.4.2) - 2023-03-13
 - Upgrade Go version to 1.19 by @koluku in https://github.com/koluku/s3s/pull/91
 - categorize global options by @koluku in https://github.com/koluku/s3s/pull/93
