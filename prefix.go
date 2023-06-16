@@ -13,13 +13,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (app *App) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]string, error) {
+func (c *Client) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]string, error) {
 	input := &s3.ListObjectsV2Input{
 		Bucket:    aws.String(bucket),
 		Prefix:    aws.String(prefix),
 		Delimiter: aws.String("/"),
 	}
-	pagenator := s3.NewListObjectsV2Paginator(app.s3, input)
+	pagenator := s3.NewListObjectsV2Paginator(c.s3, input)
 
 	var s3Keys []string
 	for pagenator.HasMorePages() {
@@ -63,13 +63,13 @@ type ObjectInfo struct {
 	Size   int64
 }
 
-func (app *App) GetS3OneKey(ctx context.Context, bucket string, prefix string) (*ObjectInfo, error) {
+func (c *Client) GetS3OneKey(ctx context.Context, bucket string, prefix string) (*ObjectInfo, error) {
 	input := &s3.ListObjectsV2Input{
 		Bucket:  aws.String(bucket),
 		Prefix:  aws.String(prefix),
 		MaxKeys: 1,
 	}
-	output, err := app.s3.ListObjectsV2(ctx, input)
+	output, err := c.s3.ListObjectsV2(ctx, input)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -81,12 +81,12 @@ func (app *App) GetS3OneKey(ctx context.Context, bucket string, prefix string) (
 	}, nil
 }
 
-func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket string, prefix string, info *KeyInfo) error {
+func (c *Client) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket string, prefix string, info *KeyInfo) error {
 	input := &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
 	}
-	pagenator := s3.NewListObjectsV2Paginator(app.s3, input)
+	pagenator := s3.NewListObjectsV2Paginator(c.s3, input)
 
 	for pagenator.HasMorePages() {
 		output, err := pagenator.NextPage(ctx)
@@ -106,7 +106,7 @@ func (app *App) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket 
 	return nil
 }
 
-func (app *App) OptimizateALBPaths(ctx context.Context, paths []string, keyInfo *KeyInfo) ([]string, error) {
+func (c *Client) OptimizateALBPaths(ctx context.Context, paths []string, keyInfo *KeyInfo) ([]string, error) {
 	if keyInfo.KeyType != KeyTypeALB || isTimeZeroRange(keyInfo.Since, keyInfo.Until) {
 		return nil, nil
 	}
@@ -121,7 +121,7 @@ func (app *App) OptimizateALBPaths(ctx context.Context, paths []string, keyInfo 
 		var bucket, prefix string
 		bucket = u.Hostname()
 		prefix = strings.TrimPrefix(u.Path, "/")
-		oi, err := app.GetS3OneKey(ctx, bucket, prefix)
+		oi, err := c.GetS3OneKey(ctx, bucket, prefix)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -157,7 +157,7 @@ func (app *App) OptimizateALBPaths(ctx context.Context, paths []string, keyInfo 
 	return npaths, nil
 }
 
-func (app *App) OptimizateCFPaths(ctx context.Context, paths []string, keyInfo *KeyInfo) ([]string, error) {
+func (c *Client) OptimizateCFPaths(ctx context.Context, paths []string, keyInfo *KeyInfo) ([]string, error) {
 	if keyInfo.KeyType != KeyTypeCF || isTimeZeroRange(keyInfo.Since, keyInfo.Until) {
 		return nil, nil
 	}
@@ -172,7 +172,7 @@ func (app *App) OptimizateCFPaths(ctx context.Context, paths []string, keyInfo *
 		var bucket, prefix string
 		bucket = u.Hostname()
 		prefix = strings.TrimPrefix(u.Path, "/")
-		oi, err := app.GetS3OneKey(ctx, bucket, prefix)
+		oi, err := c.GetS3OneKey(ctx, bucket, prefix)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}

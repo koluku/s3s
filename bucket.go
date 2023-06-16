@@ -7,9 +7,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (app *App) GetS3Bucket(ctx context.Context) ([]string, error) {
+func (c *Client) GetS3Bucket(ctx context.Context) ([]string, error) {
 	input := &s3.ListBucketsInput{}
-	output, err := app.s3.ListBuckets(ctx, input)
+	output, err := c.s3.ListBuckets(ctx, input)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

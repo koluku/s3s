@@ -89,6 +89,21 @@ const (
 	FormatTypeCFLogs
 )
 
+func (f FormatType) String() string {
+	switch f {
+	case FormatTypeJSON:
+		return "JSON"
+	case FormatTypeCSV:
+		return "CSV"
+	case FormatTypeALBLogs:
+		return "ALB"
+	case FormatTypeCFLogs:
+		return "CloudFront"
+	default:
+		return ""
+	}
+}
+
 type QueryInfo struct {
 	FormatType      FormatType
 	FieldDelimiter  string
@@ -96,9 +111,9 @@ type QueryInfo struct {
 	IsCountMode     bool
 }
 
-func (app *App) S3Select(ctx context.Context, input Querying, info *QueryInfo) (*Result, error) {
+func (c *Client) S3Select(ctx context.Context, input Querying, info *QueryInfo) (*Result, error) {
 	params := input.toParameter()
-	resp, err := app.s3.SelectObjectContent(ctx, params)
+	resp, err := c.s3.SelectObjectContent(ctx, params)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
