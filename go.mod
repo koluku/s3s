@@ -3,7 +3,7 @@ module github.com/koluku/s3s
 go 1.19
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.18.0
+	github.com/aws/aws-sdk-go-v2 v1.18.1
 	github.com/aws/aws-sdk-go-v2/config v1.18.20
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.31.2
 	github.com/dustin/go-humanize v1.0.1
