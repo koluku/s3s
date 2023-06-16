@@ -6,41 +6,39 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
-type App struct {
-	threadCount int
-	s3          *s3.Client
+const (
+	DEFAULT_THREAD_COUNT = 150
+)
+
+type Client struct {
+	s3 *s3.Client
 }
 
-func NewApp(ctx context.Context, region string, maxRetries int, threadCount int) (*App, error) {
+func New(ctx context.Context, profile string, region string) (*Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.RetryMaxAttempts = maxRetries
-		o.RetryMode = aws.RetryModeStandard
-	})
+	api := s3.NewFromConfig(cfg)
 
-	app := &App{
-		threadCount: threadCount,
-		s3:          client,
+	client := &Client{
+		s3: api,
 	}
 
-	return app, nil
+	return client, nil
 }
 
-func (app *App) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) error {
+func (c *Client) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) error {
 	switch keyInfo.KeyType {
 	case KeyTypeALB:
-		albPaths, err := app.OptimizateALBPaths(ctx, paths, keyInfo)
+		albPaths, err := c.OptimizateALBPaths(ctx, paths, keyInfo)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -48,7 +46,7 @@ func (app *App) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, query
 			paths = albPaths
 		}
 	case KeyTypeCF:
-		cfPaths, err := app.OptimizateCFPaths(ctx, paths, keyInfo)
+		cfPaths, err := c.OptimizateCFPaths(ctx, paths, keyInfo)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -57,17 +55,17 @@ func (app *App) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, query
 		}
 	}
 
-	ch := make(chan ObjectInfo, app.threadCount)
+	ch := make(chan ObjectInfo, DEFAULT_THREAD_COUNT)
 	eg, egctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		if err := app.getBucketKeys(egctx, ch, paths, keyInfo); err != nil {
+		if err := c.getBucketKeys(egctx, ch, paths, keyInfo); err != nil {
 			return errors.WithStack(err)
 		}
 		return nil
 	})
 	eg.Go(func() error {
-		if err := app.execS3Select(egctx, ch, queryStr, queryInfo); err != nil {
+		if err := c.execS3Select(egctx, ch, queryStr, queryInfo); err != nil {
 			return errors.WithStack(err)
 		}
 		return nil
@@ -80,10 +78,10 @@ func (app *App) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, query
 	return nil
 }
 
-func (app *App) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) (int64, int, error) {
+func (c *Client) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) (int64, int, error) {
 	switch keyInfo.KeyType {
 	case KeyTypeALB:
-		albPaths, err := app.OptimizateALBPaths(ctx, paths, keyInfo)
+		albPaths, err := c.OptimizateALBPaths(ctx, paths, keyInfo)
 		if err != nil {
 			return 0, 0, errors.WithStack(err)
 		}
@@ -91,7 +89,7 @@ func (app *App) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, qu
 			paths = albPaths
 		}
 	case KeyTypeCF:
-		cfPaths, err := app.OptimizateCFPaths(ctx, paths, keyInfo)
+		cfPaths, err := c.OptimizateCFPaths(ctx, paths, keyInfo)
 		if err != nil {
 			return 0, 0, errors.WithStack(err)
 		}
@@ -102,11 +100,11 @@ func (app *App) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, qu
 
 	var scanByte int64
 	var count int
-	ch := make(chan ObjectInfo, app.threadCount)
+	ch := make(chan ObjectInfo, DEFAULT_THREAD_COUNT)
 
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		if err := app.getBucketKeys(egctx, ch, paths, keyInfo); err != nil {
+		if err := c.getBucketKeys(egctx, ch, paths, keyInfo); err != nil {
 			return errors.WithStack(err)
 		}
 		return nil
@@ -126,11 +124,11 @@ func (app *App) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, qu
 	return scanByte, count, nil
 }
 
-func (app *App) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths []string, info *KeyInfo) error {
+func (c *Client) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths []string, info *KeyInfo) error {
 	defer close(ch)
 
 	eg, egctx := errgroup.WithContext(ctx)
-	eg.SetLimit(app.threadCount)
+	eg.SetLimit(DEFAULT_THREAD_COUNT)
 	for _, path := range paths {
 		path := path
 		eg.Go(func() error {
@@ -142,7 +140,7 @@ func (app *App) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths [
 			bucket = u.Hostname()
 			prefix = strings.TrimPrefix(u.Path, "/")
 
-			if app.GetS3Keys(egctx, ch, bucket, prefix, info); err != nil {
+			if c.GetS3Keys(egctx, ch, bucket, prefix, info); err != nil {
 				return errors.WithStack(err)
 			}
 			return nil
@@ -156,10 +154,10 @@ func (app *App) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths [
 	return nil
 }
 
-func (app *App) execS3Select(ctx context.Context, reciever <-chan ObjectInfo, queryStr string, info *QueryInfo) error {
+func (c *Client) execS3Select(ctx context.Context, reciever <-chan ObjectInfo, queryStr string, info *QueryInfo) error {
 	var count int
 	eg, egctx := errgroup.WithContext(ctx)
-	eg.SetLimit(app.threadCount)
+	eg.SetLimit(DEFAULT_THREAD_COUNT)
 
 	for r := range reciever {
 		bucket := r.Bucket
@@ -200,7 +198,7 @@ func (app *App) execS3Select(ctx context.Context, reciever <-chan ObjectInfo, qu
 		}
 
 		eg.Go(func() error {
-			result, err := app.S3Select(egctx, input, info)
+			result, err := c.S3Select(egctx, input, info)
 			if err != nil {
 				return errors.WithStack(err)
 			}

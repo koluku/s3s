@@ -27,7 +27,8 @@ var (
 	Version = "current"
 
 	// AWS
-	region string
+	profile string
+	region  string
 
 	// S3 Select Query
 	queryStr string
@@ -62,6 +63,14 @@ func main() {
 		Version: Version,
 		Usage:   "Easy S3 select like searching in directories",
 		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Category:    "AWS:",
+				Name:        "profile",
+				Usage:       "profile of aws credential",
+				Value:       os.Getenv("AWS_Profile"),
+				DefaultText: "ENV[\"AWS_Profile\"]",
+				Destination: &region,
+			},
 			&cli.StringFlag{
 				Category:    "AWS:",
 				Name:        "region",
@@ -221,7 +230,7 @@ func cmd(ctx context.Context, paths []string) error {
 	}
 
 	// Initialize
-	app, err := s3s.NewApp(ctx, region, maxRetries, threadCount)
+	app, err := s3s.New(ctx, profile, region)
 	if err != nil {
 		return errors.WithStack(err)
 	}

@@ -12,9 +12,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-func pathDelver(ctx context.Context, app *s3s.App, paths []string) ([]string, error) {
+func pathDelver(ctx context.Context, client *s3s.Client, paths []string) ([]string, error) {
 	if len(paths) == 0 {
-		path, err := delveBucketList(ctx, app)
+		path, err := delveBucketList(ctx, client)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -29,7 +29,7 @@ func pathDelver(ctx context.Context, app *s3s.App, paths []string) ([]string, er
 		bucket = u.Hostname()
 		prefix = strings.TrimPrefix(u.Path, "/")
 
-		path, err := delvePrefix(ctx, app, bucket, prefix)
+		path, err := delvePrefix(ctx, client, bucket, prefix)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -40,8 +40,8 @@ func pathDelver(ctx context.Context, app *s3s.App, paths []string) ([]string, er
 	return paths, nil
 }
 
-func delveBucketList(ctx context.Context, app *s3s.App) (string, error) {
-	buckets, err := app.GetS3Bucket(ctx)
+func delveBucketList(ctx context.Context, client *s3s.Client) (string, error) {
+	buckets, err := client.GetS3Bucket(ctx)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -56,11 +56,11 @@ func delveBucketList(ctx context.Context, app *s3s.App) (string, error) {
 		return "", errors.WithStack(err)
 	}
 
-	return delvePrefix(ctx, app, buckets[index], "")
+	return delvePrefix(ctx, client, buckets[index], "")
 }
 
-func delvePrefix(ctx context.Context, app *s3s.App, bucket string, prefix string) (string, error) {
-	s3Dirs, err := app.GetS3Dir(ctx, bucket, prefix)
+func delvePrefix(ctx context.Context, client *s3s.Client, bucket string, prefix string) (string, error) {
+	s3Dirs, err := client.GetS3Dir(ctx, bucket, prefix)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -89,15 +89,15 @@ func delvePrefix(ctx context.Context, app *s3s.App, bucket string, prefix string
 	case 0:
 		parent = path.Join(prefix, "../")
 		if parent == "." {
-			return delvePrefix(ctx, app, bucket, "")
+			return delvePrefix(ctx, client, bucket, "")
 		}
 		if parent == ".." {
-			return delveBucketList(ctx, app)
+			return delveBucketList(ctx, client)
 		}
-		return delvePrefix(ctx, app, bucket, parent+"/")
+		return delvePrefix(ctx, client, bucket, parent+"/")
 	case 1:
 		return fmt.Sprintf("s3://%s/%s", bucket, prefix), nil
 	default:
-		return delvePrefix(ctx, app, bucket, s3Dirs[index])
+		return delvePrefix(ctx, client, bucket, s3Dirs[index])
 	}
 }
