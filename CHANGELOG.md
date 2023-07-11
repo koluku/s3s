@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.4.4](https://github.com/koluku/s3s/compare/v0.4.3...v0.4.4) - 2023-07-11
+- Bump github.com/urfave/cli/v2 from 2.25.1 to 2.25.6 by @dependabot in https://github.com/koluku/s3s/pull/116
+- Bump github.com/aws/aws-sdk-go-v2 from 1.17.8 to 1.18.0 by @dependabot in https://github.com/koluku/s3s/pull/112
+- Bump golang.org/x/sync from 0.1.0 to 0.3.0 by @dependabot in https://github.com/koluku/s3s/pull/118
+- Bump github.com/aws/aws-sdk-go-v2 from 1.17.8 to 1.18.1 by @dependabot in https://github.com/koluku/s3s/pull/119
+- Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.31.2 to 1.31.3 by @dependabot in https://github.com/koluku/s3s/pull/109
+- rename s3s.App to s3s.Client by @koluku in https://github.com/koluku/s3s/pull/122
+- Bump github.com/aws/aws-sdk-go-v2/config from 1.18.20 to 1.18.27 by @dependabot in https://github.com/koluku/s3s/pull/121
+- add dependabot auto-merge workflow by @koluku in https://github.com/koluku/s3s/pull/125
+- Bump github.com/urfave/cli/v2 from 2.25.6 to 2.25.7 by @dependabot in https://github.com/koluku/s3s/pull/123
+- Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.31.3 to 1.35.0 by @dependabot in https://github.com/koluku/s3s/pull/124
+- add output option by @koluku in https://github.com/koluku/s3s/pull/127
+- [Experimental] add prompt mode by @koluku in https://github.com/koluku/s3s/pull/128
+
 ## [v0.4.3](https://github.com/koluku/s3s/compare/v0.4.2...v0.4.3) - 2023-04-13
 - Bump github.com/urfave/cli/v2 from 2.25.0 to 2.25.1 by @dependabot in https://github.com/koluku/s3s/pull/103
 - Bump github.com/aws/aws-sdk-go-v2 from 1.17.5 to 1.17.7 by @dependabot in https://github.com/koluku/s3s/pull/104
