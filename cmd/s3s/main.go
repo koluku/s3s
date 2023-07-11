@@ -152,8 +152,14 @@ func main() {
 				until = *cliUntil.Value()
 			}
 
-			if err := cmd(c.Context, c.Args().Slice()); err != nil {
-				return errors.WithStack(err)
+			if c.NArg() == 0 {
+				if err := prompter(c.Context); err != nil {
+					return errors.WithStack(err)
+				}
+			} else {
+				if err := cmd(c.Context, c.Args().Slice()); err != nil {
+					return errors.WithStack(err)
+				}
 			}
 			return nil
 		},
