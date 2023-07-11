@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -14,21 +15,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-const (
-	DEFAULT_QUERY            = "SELECT * FROM S3Object s"
-	DEFAULT_THREAD_COUNT     = 150
-	DEFAULT_MAX_RETRIES      = 20
-	DEFAULT_FIELD_DELIMITER  = ","
-	DEFAULT_RECORD_DELIMITER = "\n"
-)
-
 var (
 	// goreleaser
 	Version = "current"
-
-	// AWS
-	profile string
-	region  string
 
 	// S3 Select Query
 	queryStr string
@@ -46,12 +35,12 @@ var (
 	until    time.Time
 	cliUntil cli.Timestamp
 
+	output string
+
 	// command option
-	threadCount int
-	maxRetries  int
-	isDelve     bool
-	isDebug     bool
-	isDryRun    bool
+	isDelve  bool
+	isDebug  bool
+	isDryRun bool
 )
 
 func main() {
@@ -63,38 +52,6 @@ func main() {
 		Version: Version,
 		Usage:   "Easy S3 select like searching in directories",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Category:    "AWS:",
-				Name:        "profile",
-				Usage:       "profile of aws credential",
-				Value:       os.Getenv("AWS_Profile"),
-				DefaultText: "ENV[\"AWS_Profile\"]",
-				Destination: &region,
-			},
-			&cli.StringFlag{
-				Category:    "AWS:",
-				Name:        "region",
-				Usage:       "region of target s3 bucket exist",
-				Value:       os.Getenv("AWS_REGION"),
-				DefaultText: "ENV[\"AWS_REGION\"]",
-				Destination: &region,
-			},
-			&cli.IntFlag{
-				Category:    "AWS:",
-				Name:        "thread-count",
-				Aliases:     []string{"t, thread_count"},
-				Usage:       "max number of api requests to concurrently",
-				Value:       DEFAULT_THREAD_COUNT,
-				Destination: &threadCount,
-			},
-			&cli.IntFlag{
-				Category:    "AWS:",
-				Name:        "max-retries",
-				Aliases:     []string{"M, max_retries"},
-				Usage:       "max number of api requests to retry",
-				Value:       DEFAULT_MAX_RETRIES,
-				Destination: &maxRetries,
-			},
 			&cli.StringFlag{
 				Category:    "Query:",
 				Name:        "query",
@@ -126,21 +83,18 @@ func main() {
 			&cli.BoolFlag{
 				Category:    "Input Format:",
 				Name:        "csv",
-				Usage:       "",
 				Destination: &isCSV,
 			},
 			&cli.BoolFlag{
 				Category:    "Input Format:",
 				Name:        "alb-logs",
 				Aliases:     []string{"alb_logs"},
-				Usage:       "",
 				Destination: &isALBLogs,
 			},
 			&cli.BoolFlag{
 				Category:    "Input Format:",
 				Name:        "cf-logs",
 				Aliases:     []string{"cf_logs"},
-				Usage:       "",
 				Destination: &isCFLogs,
 			},
 			&cli.DurationFlag{
@@ -165,11 +119,16 @@ func main() {
 				Timezone:    time.UTC,
 				Destination: &cliUntil,
 			},
+			&cli.StringFlag{
+				Category:    "Output:",
+				Name:        "output",
+				Aliases:     []string{"o"},
+				Destination: &output,
+			},
 			&cli.BoolFlag{
 				Category:    "Run:",
 				Name:        "delve",
 				Usage:       "like directory move before querying",
-				Value:       false,
 				Destination: &isDelve,
 			},
 			&cli.BoolFlag{
@@ -177,13 +136,11 @@ func main() {
 				Name:        "dry-run",
 				Aliases:     []string{"dry_run"},
 				Usage:       "pre request for s3 select",
-				Value:       false,
 				Destination: &isDryRun,
 			},
 			&cli.BoolFlag{
 				Name:        "debug",
 				Usage:       "erorr check for developer",
-				Value:       false,
 				Destination: &isDebug,
 			},
 		},
@@ -230,7 +187,7 @@ func cmd(ctx context.Context, paths []string) error {
 	}
 
 	// Initialize
-	app, err := s3s.New(ctx, profile, region)
+	app, err := s3s.New(ctx)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -247,61 +204,67 @@ func cmd(ctx context.Context, paths []string) error {
 	if queryStr == "" {
 		queryStr = buildQuery(where, limit, isCount, isALBLogs, isCFLogs)
 	}
-	queryInfo := &s3s.QueryInfo{
-		IsCountMode: isCount,
-	}
-	keyInfo := &s3s.KeyInfo{
-		KeyType: s3s.KeyTypeNone,
-	}
-	switch {
-	case isCSV:
-		queryInfo.FormatType = s3s.FormatTypeCSV
-		queryInfo.FieldDelimiter = ","
-		queryInfo.RecordDelimiter = "\n"
-	case isALBLogs:
-		queryInfo.FormatType = s3s.FormatTypeALBLogs
-		queryInfo.FieldDelimiter = " "
-		queryInfo.RecordDelimiter = "\n"
-
-		keyInfo.KeyType = s3s.KeyTypeALB
-		if duration > 0 {
-			keyInfo.Since = time.Now().UTC().Add(-duration)
-			keyInfo.Until = time.Now().UTC()
-		} else {
-			keyInfo.Since = since
-			keyInfo.Until = until
-		}
-	case isCFLogs:
-		queryInfo.FormatType = s3s.FormatTypeCFLogs
-		queryInfo.FieldDelimiter = "\t"
-		queryInfo.RecordDelimiter = "\n"
-
-		keyInfo.KeyType = s3s.KeyTypeCF
-		if duration > 0 {
-			keyInfo.Since = time.Now().UTC().Add(-duration)
-			keyInfo.Until = time.Now().UTC()
-		} else {
-			keyInfo.Since = since
-			keyInfo.Until = until
-		}
-	default:
-		queryInfo.FormatType = s3s.FormatTypeJSON
-	}
-
-	if isDryRun {
-		scanByte, count, err := app.DryRun(ctx, paths, keyInfo, queryStr, queryInfo)
+	var outputPath string
+	if output != "" {
+		outputPath, err = filepath.Abs(output)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		fmt.Printf("all scan byte: %s\n", humanize.Bytes(uint64(scanByte)))
-		fmt.Printf("file count: %s\n", humanize.Comma(int64(count)))
-	} else {
-		if err := app.Run(ctx, paths, keyInfo, queryStr, queryInfo); err != nil {
-			return errors.WithStack(err)
-		}
 	}
 
-	// Finalize
+	var query *s3s.Query
+	switch {
+	case isCSV:
+		query = &s3s.Query{
+			FormatType: s3s.FormatTypeCSV,
+			Query:      queryStr,
+		}
+	case isALBLogs:
+		query = &s3s.Query{
+			FormatType: s3s.FormatTypeALBLogs,
+			Query:      queryStr,
+		}
+		if duration > 0 {
+			query.Since = time.Now().UTC().Add(-duration)
+			query.Until = time.Now().UTC()
+		} else {
+			query.Since = since
+			query.Until = until
+		}
+	case isCFLogs:
+		query = &s3s.Query{
+			FormatType: s3s.FormatTypeCFLogs,
+			Query:      queryStr,
+		}
+		if duration > 0 {
+			query.Since = time.Now().UTC().Add(-duration)
+			query.Until = time.Now().UTC()
+		} else {
+			query.Since = since
+			query.Until = until
+		}
+	default:
+		query = &s3s.Query{
+			FormatType: s3s.FormatTypeJSON,
+			Query:      queryStr,
+		}
+	}
+	option := &s3s.Option{
+		IsDryRun:    isDryRun,
+		IsCountMode: isCount,
+		Output:      outputPath,
+	}
+
+	result, err := app.Run(ctx, paths, query, option)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	// Output
+	if isDryRun {
+		fmt.Printf("file count: %s\n", humanize.Comma(int64(result.Count)))
+		fmt.Printf("all scan byte: %s\n", humanize.Bytes(uint64(result.Bytes)))
+	}
 	if isDelve {
 		for _, path := range paths {
 			fmt.Fprintln(os.Stderr, path)
