@@ -62,6 +62,7 @@ func executor(ctx context.Context, s string) {
 						fmt.Println("Please specify a directory path.")
 						return nil
 					}
+					pathsForPrompetr = c.Args().Slice()
 					return nil
 				},
 			},
@@ -137,7 +138,8 @@ func executor(ctx context.Context, s string) {
 						Output:      outputPath,
 					}
 
-					if _, err := app.Run(ctx, pathsForPrompetr, query, option); err != nil {
+					p := pathsForPrompetr
+					if _, err := app.Run(ctx, p, query, option); err != nil {
 						log.Println(err)
 						return nil
 					}
