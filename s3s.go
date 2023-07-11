@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -16,12 +18,34 @@ const (
 	DEFAULT_THREAD_COUNT = 150
 )
 
+type FormatType int
+
+const (
+	FormatTypeJSON FormatType = iota
+	FormatTypeCSV
+	FormatTypeALBLogs
+	FormatTypeCFLogs
+)
+
+type Query struct {
+	FormatType FormatType
+	Query      string
+	Since      time.Time
+	Until      time.Time
+}
+
+type Option struct {
+	IsDryRun    bool
+	IsCountMode bool
+	Output      string
+}
+
 type Client struct {
 	s3 *s3.Client
 }
 
-func New(ctx context.Context, profile string, region string) (*Client, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+func New(ctx context.Context) (*Client, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -35,112 +59,94 @@ func New(ctx context.Context, profile string, region string) (*Client, error) {
 	return client, nil
 }
 
-func (c *Client) Run(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) error {
-	switch keyInfo.KeyType {
-	case KeyTypeALB:
-		albPaths, err := c.OptimizateALBPaths(ctx, paths, keyInfo)
+type Result struct {
+	Count int
+	Bytes int64
+}
+
+func (c *Client) Run(ctx context.Context, prefixes []string, query *Query, option *Option) (*Result, error) {
+	result := &Result{}
+
+	switch query.FormatType {
+	case FormatTypeALBLogs:
+		albPrefixes, err := c.OptimizateALBPrefixes(ctx, prefixes, query)
 		if err != nil {
-			return errors.WithStack(err)
+			return nil, errors.WithStack(err)
 		}
-		if albPaths != nil {
-			paths = albPaths
+		if albPrefixes != nil {
+			prefixes = albPrefixes
 		}
-	case KeyTypeCF:
-		cfPaths, err := c.OptimizateCFPaths(ctx, paths, keyInfo)
+	case FormatTypeCFLogs:
+		cfPrefixes, err := c.OptimizateCFPrefixes(ctx, prefixes, query)
 		if err != nil {
-			return errors.WithStack(err)
+			return nil, errors.WithStack(err)
 		}
-		if cfPaths != nil {
-			paths = cfPaths
+		if cfPrefixes != nil {
+			prefixes = cfPrefixes
 		}
 	}
 
-	ch := make(chan ObjectInfo, DEFAULT_THREAD_COUNT)
+	pathCH := make(chan s3Object, DEFAULT_THREAD_COUNT)
 	eg, egctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		if err := c.getBucketKeys(egctx, ch, paths, keyInfo); err != nil {
+		if err := c.getBucketKeys(egctx, pathCH, prefixes, query); err != nil {
 			return errors.WithStack(err)
 		}
 		return nil
 	})
-	eg.Go(func() error {
-		if err := c.execS3Select(egctx, ch, queryStr, queryInfo); err != nil {
-			return errors.WithStack(err)
-		}
-		return nil
-	})
+
+	jsonCH := make(chan []byte, DEFAULT_THREAD_COUNT)
+
+	if !option.IsDryRun {
+		eg.Go(func() error {
+			if err := c.execS3Select(egctx, pathCH, jsonCH, query, option); err != nil {
+				return errors.WithStack(err)
+			}
+			return nil
+		})
+	} else {
+		eg.Go(func() error {
+			for c := range pathCH {
+				result.Bytes += c.Size
+				result.Count++
+			}
+			return nil
+		})
+	}
+
+	if !option.IsDryRun {
+		eg.Go(func() error {
+			if err := c.writeOutput(egctx, jsonCH, option); err != nil {
+				return errors.WithStack(err)
+			}
+			return nil
+		})
+	}
 
 	if err := eg.Wait(); err != nil {
-		return errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
-	return nil
+	return result, nil
 }
 
-func (c *Client) DryRun(ctx context.Context, paths []string, keyInfo *KeyInfo, queryStr string, queryInfo *QueryInfo) (int64, int, error) {
-	switch keyInfo.KeyType {
-	case KeyTypeALB:
-		albPaths, err := c.OptimizateALBPaths(ctx, paths, keyInfo)
-		if err != nil {
-			return 0, 0, errors.WithStack(err)
-		}
-		if albPaths != nil {
-			paths = albPaths
-		}
-	case KeyTypeCF:
-		cfPaths, err := c.OptimizateCFPaths(ctx, paths, keyInfo)
-		if err != nil {
-			return 0, 0, errors.WithStack(err)
-		}
-		if cfPaths != nil {
-			paths = cfPaths
-		}
-	}
-
-	var scanByte int64
-	var count int
-	ch := make(chan ObjectInfo, DEFAULT_THREAD_COUNT)
-
-	eg, egctx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		if err := c.getBucketKeys(egctx, ch, paths, keyInfo); err != nil {
-			return errors.WithStack(err)
-		}
-		return nil
-	})
-	eg.Go(func() error {
-		for r := range ch {
-			scanByte += r.Size
-			count++
-		}
-		return nil
-	})
-
-	if err := eg.Wait(); err != nil {
-		return 0, 0, errors.WithStack(err)
-	}
-
-	return scanByte, count, nil
-}
-
-func (c *Client) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths []string, info *KeyInfo) error {
-	defer close(ch)
+func (c *Client) getBucketKeys(ctx context.Context, in chan<- s3Object, prefixes []string, info *Query) error {
+	defer close(in)
 
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.SetLimit(DEFAULT_THREAD_COUNT)
-	for _, path := range paths {
-		path := path
+	for _, prefix := range prefixes {
+		prefix := prefix
 		eg.Go(func() error {
-			u, err := url.Parse(path)
+			u, err := url.Parse(prefix)
 			if err != nil {
 				return errors.WithStack(err)
 			}
-			var bucket, prefix string
-			bucket = u.Hostname()
-			prefix = strings.TrimPrefix(u.Path, "/")
+			bucket := u.Hostname()
+			newPrefix := strings.TrimPrefix(u.Path, "/")
 
-			if c.GetS3Keys(egctx, ch, bucket, prefix, info); err != nil {
+			if c.GetS3Keys(egctx, in, bucket, newPrefix, info); err != nil {
 				return errors.WithStack(err)
 			}
 			return nil
@@ -154,66 +160,81 @@ func (c *Client) getBucketKeys(ctx context.Context, ch chan<- ObjectInfo, paths 
 	return nil
 }
 
-func (c *Client) execS3Select(ctx context.Context, reciever <-chan ObjectInfo, queryStr string, info *QueryInfo) error {
-	var count int
+func (c *Client) execS3Select(ctx context.Context, out <-chan s3Object, in chan<- []byte, query *Query, option *Option) error {
+	defer close(in)
+
 	eg, egctx := errgroup.WithContext(ctx)
 	eg.SetLimit(DEFAULT_THREAD_COUNT)
 
-	for r := range reciever {
-		bucket := r.Bucket
-		key := r.Key
+LOOP:
+	for {
+		select {
+		case s3object, ok := <-out:
+			if !ok {
+				break LOOP
+			}
 
-		var input Querying
-		switch {
-		case info.FormatType == FormatTypeCSV:
-			input = &CSVInput{
-				Bucket:          bucket,
-				Key:             key,
-				Query:           queryStr,
-				FieldDelimiter:  info.FieldDelimiter,
-				RecordDelimiter: info.RecordDelimiter,
+			var input *s3SelectInput
+			switch query.FormatType {
+			case FormatTypeJSON:
+				input = &s3SelectInput{
+					Bucket: s3object.Bucket,
+					Key:    s3object.Key,
+					Query:  query.Query,
+				}
+			case FormatTypeCSV, FormatTypeALBLogs, FormatTypeCFLogs:
+				input = &s3SelectInput{
+					Bucket: s3object.Bucket,
+					Key:    s3object.Key,
+					Query:  query.Query,
+				}
 			}
-		case info.FormatType == FormatTypeALBLogs:
-			input = &CSVInput{
-				Bucket:          bucket,
-				Key:             key,
-				Query:           queryStr,
-				FieldDelimiter:  info.FieldDelimiter,
-				RecordDelimiter: info.RecordDelimiter,
-			}
-		case info.FormatType == FormatTypeCFLogs:
-			input = &CSVInput{
-				Bucket:          bucket,
-				Key:             key,
-				Query:           queryStr,
-				FieldDelimiter:  info.FieldDelimiter,
-				RecordDelimiter: info.RecordDelimiter,
-			}
-		default:
-			input = &JSONInput{
-				Bucket: bucket,
-				Key:    key,
-				Query:  queryStr,
-			}
-		}
 
-		eg.Go(func() error {
-			result, err := c.S3Select(egctx, input, info)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			count += result.Count
+			eg.Go(func() error {
+				if err := c.s3Select(egctx, in, input, option); err != nil {
+					return errors.WithStack(err)
+				}
+				return nil
+			})
+		case <-ctx.Done():
 			return nil
-		})
+		}
 	}
 
 	if err := eg.Wait(); err != nil {
 		return errors.WithStack(err)
 	}
 
-	if info.IsCountMode {
-		fmt.Println(count)
+	return nil
+}
+
+func (c *Client) writeOutput(ctx context.Context, out <-chan []byte, option *Option) error {
+	var file *os.File
+	if option.Output != "" {
+		f, err := os.OpenFile(option.Output, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		file = f
+		defer file.Close()
 	}
 
-	return nil
+	for {
+		select {
+		case json, ok := <-out:
+			if !ok {
+				return nil
+			}
+
+			fmt.Println(string(json))
+
+			if file != nil {
+				if _, err := file.WriteString(string(json) + "\n"); err != nil {
+					return errors.WithStack(err)
+				}
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }

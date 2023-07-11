@@ -43,49 +43,37 @@ func (c *Client) GetS3Dir(ctx context.Context, bucket string, prefix string) ([]
 	return s3Keys, nil
 }
 
-type KeyType int
-
-const (
-	KeyTypeNone KeyType = iota
-	KeyTypeALB
-	KeyTypeCF
-)
-
-type KeyInfo struct {
-	KeyType KeyType
-	Since   time.Time
-	Until   time.Time
-}
-
-type ObjectInfo struct {
+type s3Object struct {
 	Bucket string
 	Key    string
 	Size   int64
 }
 
-func (c *Client) GetS3OneKey(ctx context.Context, bucket string, prefix string) (*ObjectInfo, error) {
+func (c *Client) GetS3OneKey(ctx context.Context, bucket string, prefix string) (*s3Object, error) {
 	input := &s3.ListObjectsV2Input{
 		Bucket:  aws.String(bucket),
 		Prefix:  aws.String(prefix),
 		MaxKeys: 1,
 	}
+
 	output, err := c.s3.ListObjectsV2(ctx, input)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	return &ObjectInfo{
+	return &s3Object{
 		Bucket: bucket,
 		Key:    *output.Contents[0].Key,
 		Size:   output.Contents[0].Size,
 	}, nil
 }
 
-func (c *Client) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket string, prefix string, info *KeyInfo) error {
+func (c *Client) GetS3Keys(ctx context.Context, sender chan<- s3Object, bucket string, prefix string, info *Query) error {
 	input := &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
 	}
+
 	pagenator := s3.NewListObjectsV2Paginator(c.s3, input)
 
 	for pagenator.HasMorePages() {
@@ -95,7 +83,7 @@ func (c *Client) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket
 		}
 
 		for i := range output.Contents {
-			sender <- ObjectInfo{
+			sender <- s3Object{
 				Bucket: bucket,
 				Key:    *output.Contents[i].Key,
 				Size:   output.Contents[i].Size,
@@ -106,14 +94,17 @@ func (c *Client) GetS3Keys(ctx context.Context, sender chan<- ObjectInfo, bucket
 	return nil
 }
 
-func (c *Client) OptimizateALBPaths(ctx context.Context, paths []string, keyInfo *KeyInfo) ([]string, error) {
-	if keyInfo.KeyType != KeyTypeALB || isTimeZeroRange(keyInfo.Since, keyInfo.Until) {
+func (c *Client) OptimizateALBPrefixes(ctx context.Context, prefixes []string, keyInfo *Query) ([]string, error) {
+	if keyInfo.FormatType != FormatTypeALBLogs {
+		return nil, nil
+	}
+	if isTimeZeroRange(keyInfo.Since, keyInfo.Until) {
 		return nil, nil
 	}
 
-	var npaths []string
-	for _, path := range paths {
-		u, err := url.Parse(path)
+	var newPrefixes []string
+	for _, prefix := range prefixes {
+		u, err := url.Parse(prefix)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -142,29 +133,32 @@ func (c *Client) OptimizateALBPaths(ctx context.Context, paths []string, keyInfo
 			}
 			delta := until.Sub(since)
 			if delta >= time.Hour*24 {
-				npaths = append(npaths, fmt.Sprintf("s3://%s/%s%s%s_%s", bucket, prefixA, since.Format("2006/01/02"), prefixB, since.Format("20060102")))
+				newPrefixes = append(newPrefixes, fmt.Sprintf("s3://%s/%s%s%s_%s", bucket, prefixA, since.Format("2006/01/02"), prefixB, since.Format("20060102")))
 				since = since.Add(time.Hour * 24)
 			} else if delta >= time.Hour {
-				npaths = append(npaths, fmt.Sprintf("s3://%s/%s%s%s_%s", bucket, prefixA, since.Format("2006/01/02"), prefixB, since.Format("20060102T15")))
+				newPrefixes = append(newPrefixes, fmt.Sprintf("s3://%s/%s%s%s_%s", bucket, prefixA, since.Format("2006/01/02"), prefixB, since.Format("20060102T15")))
 				since = since.Add(time.Hour)
 			} else {
-				npaths = append(npaths, fmt.Sprintf("s3://%s/%s%s%s_%s", bucket, prefixA, since.Format("2006/01/02"), prefixB, since.Format("20060102T1504Z")))
+				newPrefixes = append(newPrefixes, fmt.Sprintf("s3://%s/%s%s%s_%s", bucket, prefixA, since.Format("2006/01/02"), prefixB, since.Format("20060102T1504Z")))
 				since = since.Add(time.Minute * 5)
 			}
 		}
 	}
 
-	return npaths, nil
+	return newPrefixes, nil
 }
 
-func (c *Client) OptimizateCFPaths(ctx context.Context, paths []string, keyInfo *KeyInfo) ([]string, error) {
-	if keyInfo.KeyType != KeyTypeCF || isTimeZeroRange(keyInfo.Since, keyInfo.Until) {
+func (c *Client) OptimizateCFPrefixes(ctx context.Context, prefixes []string, keyInfo *Query) ([]string, error) {
+	if keyInfo.FormatType != FormatTypeCFLogs {
+		return nil, nil
+	}
+	if isTimeZeroRange(keyInfo.Since, keyInfo.Until) {
 		return nil, nil
 	}
 
-	var npaths []string
-	for _, path := range paths {
-		u, err := url.Parse(path)
+	var newPrefixes []string
+	for _, prefix := range prefixes {
+		u, err := url.Parse(prefix)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -188,14 +182,14 @@ func (c *Client) OptimizateCFPaths(ctx context.Context, paths []string, keyInfo 
 			}
 			delta := until.Sub(since)
 			if delta >= time.Hour*24 {
-				npaths = append(npaths, fmt.Sprintf("s3://%s/%s%s", bucket, distribution, since.Format("2006-01-02")))
+				newPrefixes = append(newPrefixes, fmt.Sprintf("s3://%s/%s%s", bucket, distribution, since.Format("2006-01-02")))
 				since = since.Add(time.Hour * 24)
 			} else {
-				npaths = append(npaths, fmt.Sprintf("s3://%s/%s%s", bucket, distribution, since.Format("2006-01-02-15.")))
+				newPrefixes = append(newPrefixes, fmt.Sprintf("s3://%s/%s%s", bucket, distribution, since.Format("2006-01-02-15.")))
 				since = since.Add(time.Hour)
 			}
 		}
 	}
 
-	return npaths, nil
+	return newPrefixes, nil
 }

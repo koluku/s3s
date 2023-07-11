@@ -8,23 +8,29 @@ import (
 
 func TestSuggestCompressionType(t *testing.T) {
 	cases := []struct {
-		name string
-		key  string
-		want types.CompressionType
+		name  string
+		input *s3SelectInput
+		want  types.CompressionType
 	}{
 		{
 			name: "GZIP",
-			key:  "all-logs/2022/06/16/1626.gz",
+			input: &s3SelectInput{
+				Key: "all-logs/2022/06/16/1626.gz",
+			},
 			want: types.CompressionTypeGzip,
 		},
 		{
 			name: "BZIP2",
-			key:  "all-logs/2022/06/16/1626.bz2",
+			input: &s3SelectInput{
+				Key: "all-logs/2022/06/16/1626.bz2",
+			},
 			want: types.CompressionTypeBzip2,
 		},
 		{
 			name: "JSON as None",
-			key:  "all-logs/2022/06/16/1626.json",
+			input: &s3SelectInput{
+				Key: "all-logs/2022/06/16/1626.json",
+			},
 			want: types.CompressionTypeNone,
 		},
 	}
@@ -33,7 +39,7 @@ func TestSuggestCompressionType(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := suggestCompressionType(tt.key)
+			got := tt.input.suggestCompressionType()
 
 			if got != tt.want {
 				t.Errorf("%s", tt.name)

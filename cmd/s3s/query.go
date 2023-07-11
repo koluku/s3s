@@ -5,6 +5,10 @@ import (
 	"strconv"
 )
 
+const (
+	DEFAULT_QUERY = "SELECT * FROM S3Object s"
+)
+
 var (
 	albLogsWhereMap = map[string]string{
 		"type":                     "_1",
@@ -92,6 +96,7 @@ func buildQuery(where string, limit int, isCount bool, isALBLogs bool, isCFLogs 
 	if limit != 0 {
 		query += " LIMIT " + strconv.Itoa(limit)
 	}
+
 	if isALBLogs {
 		for k, v := range albLogsWhereMap {
 			rep := regexp.MustCompile(` (s\.)?` + "`?" + k + "`" + `? `)
