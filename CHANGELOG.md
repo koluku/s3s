@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.5.1](https://github.com/koluku/s3s/compare/v0.5.0...v0.5.1) - 2023-08-07
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.27 to 1.18.28 by @dependabot in https://github.com/koluku/s3s/pull/129
+- (auto merged) Bump github.com/c-bata/go-prompt from 0.2.3 to 0.2.6 by @dependabot in https://github.com/koluku/s3s/pull/130
+- Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.35.0 to 1.37.0 by @dependabot in https://github.com/koluku/s3s/pull/132
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.28 to 1.18.31 by @dependabot in https://github.com/koluku/s3s/pull/135
+- Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.37.0 to 1.38.0 by @dependabot in https://github.com/koluku/s3s/pull/134
+
 ## [v0.4.4](https://github.com/koluku/s3s/compare/v0.4.3...v0.4.4) - 2023-07-11
 - Bump github.com/urfave/cli/v2 from 2.25.1 to 2.25.6 by @dependabot in https://github.com/koluku/s3s/pull/116
 - Bump github.com/aws/aws-sdk-go-v2 from 1.17.8 to 1.18.0 by @dependabot in https://github.com/koluku/s3s/pull/112
