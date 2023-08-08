@@ -2,16 +2,18 @@ package main
 
 import "testing"
 
-func TestBuildQuery(t *testing.T) {
-	cases := []struct {
-		name      string
-		where     string
-		limit     int
-		isCount   bool
-		isALBLogs bool
-		isCFLogs  bool
-		want      string
-	}{
+type buildQueryTestCase struct {
+	name      string
+	where     string
+	limit     int
+	isCount   bool
+	isALBLogs bool
+	isCFLogs  bool
+	want      string
+}
+
+var (
+	buildQueryTestCases = []*buildQueryTestCase{
 		{
 			name:      "default",
 			where:     "",
@@ -121,14 +123,27 @@ func TestBuildQuery(t *testing.T) {
 			want:      "SELECT * FROM S3Object s WHERE s._1 > '2022-09-26'",
 		},
 	}
+)
 
-	for _, tt := range cases {
+func TestBuildQuery(t *testing.T) {
+	for _, tt := range buildQueryTestCases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := buildQuery(tt.where, tt.limit, tt.isCount, tt.isALBLogs, tt.isCFLogs)
 			if got != tt.want {
 				t.Errorf("want = %s,\nbut got = %s", tt.want, got)
+			}
+		})
+	}
+}
+
+func BenchmarkBuildQuery(b *testing.B) {
+	for _, bb := range buildQueryTestCases {
+		bb := bb
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				buildQuery(bb.where, bb.limit, bb.isCount, bb.isALBLogs, bb.isCFLogs)
 			}
 		})
 	}

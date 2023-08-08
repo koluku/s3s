@@ -3,6 +3,9 @@ package main
 import (
 	"regexp"
 	"strconv"
+	"time"
+
+	"github.com/koluku/s3s"
 )
 
 const (
@@ -106,6 +109,70 @@ func buildQuery(where string, limit int, isCount bool, isALBLogs bool, isCFLogs 
 		for k, v := range cfLogsWhereMap {
 			rep := regexp.MustCompile(` (s\.)?` + "`?" + k + "`" + `? `)
 			query = rep.ReplaceAllString(query, " s."+v+" ")
+		}
+	}
+
+	return query
+}
+func (state *State) newquery() *s3s.Query {
+	// Execution
+	if state.Query == "" {
+		state.Query = buildQuery(state.Where, state.Limit, state.IsCount, state.IsAlbLogs, state.IsCfLogs)
+	}
+
+	var query *s3s.Query
+	switch {
+	case state.IsCSV:
+		query = &s3s.Query{
+			FormatType: s3s.FormatTypeCSV,
+			Query:      state.Query,
+		}
+	case state.IsAlbLogs:
+		query = &s3s.Query{
+			FormatType: s3s.FormatTypeALBLogs,
+			Query:      state.Query,
+		}
+		if state.Duration > 0 {
+			query.Since = time.Now().UTC().Add(-state.Duration)
+			query.Until = time.Now().UTC()
+		} else {
+			if state.Since != nil {
+				query.Since = *state.Since
+			} else {
+				query.Since = state.Until.Add(-state.Duration)
+			}
+
+			if state.Until != nil {
+				query.Until = *state.Until
+			} else {
+				query.Until = state.Until.Add(state.Duration)
+			}
+		}
+	case state.IsCfLogs:
+		query = &s3s.Query{
+			FormatType: s3s.FormatTypeCFLogs,
+			Query:      state.Query,
+		}
+		if state.Duration > 0 {
+			query.Since = time.Now().UTC().Add(-state.Duration)
+			query.Until = time.Now().UTC()
+		} else {
+			if state.Since != nil {
+				query.Since = *state.Since
+			} else {
+				query.Since = state.Until.Add(-state.Duration)
+			}
+
+			if state.Until != nil {
+				query.Until = *state.Until
+			} else {
+				query.Until = state.Until.Add(state.Duration)
+			}
+		}
+	default:
+		query = &s3s.Query{
+			FormatType: s3s.FormatTypeJSON,
+			Query:      state.Query,
 		}
 	}
 
