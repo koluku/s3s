@@ -139,6 +139,11 @@ func main() {
 				Destination: &isDryRun,
 			},
 			&cli.BoolFlag{
+				Name:    "interactive",
+				Aliases: []string{"i"},
+				Usage:   "use as interactive mode",
+			},
+			&cli.BoolFlag{
 				Name:        "debug",
 				Usage:       "erorr check for developer",
 				Destination: &isDebug,
@@ -152,7 +157,7 @@ func main() {
 				until = *cliUntil.Value()
 			}
 
-			if c.NArg() == 0 {
+			if c.Bool("interactive") {
 				if err := prompter(c.Context); err != nil {
 					return errors.WithStack(err)
 				}
