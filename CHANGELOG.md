@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.2](https://github.com/koluku/s3s/compare/v0.5.1...v0.5.2) - 2023-08-08
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.31 to 1.18.33 by @dependabot in https://github.com/koluku/s3s/pull/137
+- fix that delve option doesn't work by @koluku in https://github.com/koluku/s3s/pull/141
+
 ## [v0.5.1](https://github.com/koluku/s3s/compare/v0.5.0...v0.5.1) - 2023-08-07
 - (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.27 to 1.18.28 by @dependabot in https://github.com/koluku/s3s/pull/129
 - (auto merged) Bump github.com/c-bata/go-prompt from 0.2.3 to 0.2.6 by @dependabot in https://github.com/koluku/s3s/pull/130

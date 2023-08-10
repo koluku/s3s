@@ -27,10 +27,10 @@ type State struct {
 	Output string
 
 	// command option
-	IsDelve        bool
-	IsIntteractive bool
-	IsDebug        bool
-	IsDryRun       bool
+	IsDelve       bool
+	IsInteractive bool
+	IsDebug       bool
+	IsDryRun      bool
 }
 
 func (state *State) Validate() error {

@@ -22,7 +22,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer stop()
 
-	state := &State{}
+	var state State
+	var runner Runner
 
 	app := &cli.App{
 		Name:    Name,
@@ -113,7 +114,12 @@ func main() {
 			&cli.BoolFlag{
 				Name:        "intteractive",
 				Aliases:     []string{"i"},
-				Destination: &state.IsIntteractive,
+				Destination: &state.IsInteractive,
+			},
+			&cli.BoolFlag{
+				Name:    "interactive",
+				Aliases: []string{"i"},
+				Usage:   "use as interactive mode",
 			},
 			&cli.BoolFlag{
 				Name:        "debug",
@@ -131,16 +137,15 @@ func main() {
 				return errors.WithStack(err)
 			}
 
-			var runner Runner
-			if state.IsIntteractive {
+			if state.IsInteractive {
 				runner = &PromptRunner{
 					s3s:   client,
-					state: state,
+					state: &state,
 				}
 			} else {
 				runner = &CommandLineRunner{
 					s3s:   client,
-					state: state,
+					state: &state,
 				}
 			}
 
