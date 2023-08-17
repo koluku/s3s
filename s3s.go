@@ -189,6 +189,7 @@ LOOP:
 					Query:  query.Query,
 				}
 			}
+			input.FormatType = query.FormatType
 
 			eg.Go(func() error {
 				if err := c.s3Select(egctx, in, input, option); err != nil {
