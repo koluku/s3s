@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.5.3](https://github.com/koluku/s3s/compare/v0.5.2...v0.5.3) - 2023-08-17
+- Fix format type selection bug, always json by @mashiike in https://github.com/koluku/s3s/pull/143
+
 ## [v0.5.2](https://github.com/koluku/s3s/compare/v0.5.1...v0.5.2) - 2023-08-08
 - (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.31 to 1.18.33 by @dependabot in https://github.com/koluku/s3s/pull/137
 - fix that delve option doesn't work by @koluku in https://github.com/koluku/s3s/pull/141
