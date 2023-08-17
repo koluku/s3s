@@ -21,7 +21,7 @@ const (
 type FormatType int
 
 const (
-	FormatTypeJSON FormatType = iota
+	FormatTypeJSON FormatType = iota + 1
 	FormatTypeCSV
 	FormatTypeALBLogs
 	FormatTypeCFLogs
