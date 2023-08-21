@@ -22,8 +22,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer stop()
 
+	var config Config
 	var state State
-	var runner Runner
 
 	app := &cli.App{
 		Name:    Name,
@@ -114,7 +114,7 @@ func main() {
 			&cli.BoolFlag{
 				Name:        "intteractive",
 				Aliases:     []string{"i"},
-				Destination: &state.IsInteractive,
+				Destination: &config.IsInteractive,
 			},
 			&cli.BoolFlag{
 				Name:    "interactive",
@@ -124,11 +124,11 @@ func main() {
 			&cli.BoolFlag{
 				Name:        "debug",
 				Usage:       "erorr check for developer",
-				Destination: &state.IsDebug,
+				Destination: &config.IsDebug,
 			},
 		},
 		Action: func(c *cli.Context) error {
-			state.Paths = c.Args().Slice()
+			state.Prefixes = c.Args().Slice()
 			state.Since = c.Timestamp("since")
 			state.Until = c.Timestamp("until")
 
@@ -137,7 +137,8 @@ func main() {
 				return errors.WithStack(err)
 			}
 
-			if state.IsInteractive {
+			var runner Runner
+			if config.IsInteractive {
 				runner = &PromptRunner{
 					s3s:   client,
 					state: &state,
@@ -154,7 +155,7 @@ func main() {
 	}
 
 	if err := app.RunContext(ctx, os.Args); err != nil {
-		if state.IsDebug {
+		if config.IsDebug {
 			log.Fatalf("%+v\n", err)
 		} else {
 			log.Fatal(err)

@@ -8,7 +8,7 @@ import (
 
 type State struct {
 	// Runner
-	Paths []string
+	Prefixes []string
 
 	// S3 Select Query
 	Query   string
@@ -27,14 +27,12 @@ type State struct {
 	Output string
 
 	// command option
-	IsDelve       bool
-	IsInteractive bool
-	IsDebug       bool
-	IsDryRun      bool
+	IsDelve  bool
+	IsDryRun bool
 }
 
 func (state *State) Validate() error {
-	if err := state.checkArgs(state.Paths); err != nil {
+	if err := state.checkArgs(state.Prefixes); err != nil {
 		return errors.WithStack(err)
 	}
 	if err := state.checkTime(); err != nil {

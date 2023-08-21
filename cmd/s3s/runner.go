@@ -31,11 +31,11 @@ func (r *CommandLineRunner) Run(ctx context.Context) error {
 	}
 
 	if r.state.IsDelve {
-		newPaths, err := pathDelver(ctx, r.s3s, r.state.Paths)
+		newPaths, err := pathDelver(ctx, r.s3s, r.state.Prefixes)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		r.state.Paths = newPaths
+		r.state.Prefixes = newPaths
 	}
 
 	// Execution
@@ -55,7 +55,7 @@ func (r *CommandLineRunner) Run(ctx context.Context) error {
 		Output:      outputPath,
 	}
 
-	result, err := r.s3s.Run(ctx, r.state.Paths, query, option)
+	result, err := r.s3s.Run(ctx, r.state.Prefixes, query, option)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -66,7 +66,7 @@ func (r *CommandLineRunner) Run(ctx context.Context) error {
 		fmt.Printf("all scan byte: %s\n", humanize.Bytes(uint64(result.Bytes)))
 	}
 	if r.state.IsDelve {
-		for _, path := range r.state.Paths {
+		for _, path := range r.state.Prefixes {
 			fmt.Fprintln(os.Stderr, path)
 		}
 	}
@@ -101,21 +101,21 @@ func (r *PromptRunner) Run(ctx context.Context) error {
 						if err != nil {
 							return errors.WithStack(err)
 						}
-						r.state.Paths = newPaths
+						r.state.Prefixes = newPaths
 						return nil
 					}
 					if c.NArg() == 0 {
 						fmt.Println("Please specify a directory path.")
 						return nil
 					}
-					r.state.Paths = c.Args().Slice()
+					r.state.Prefixes = c.Args().Slice()
 					return nil
 				},
 			},
 			{
 				Name: "state",
 				Action: func(c *cli.Context) error {
-					fmt.Println(r.state.Paths)
+					fmt.Println(r.state.Prefixes)
 					return nil
 				},
 			},
@@ -202,7 +202,7 @@ func (r *PromptRunner) Run(ctx context.Context) error {
 						Output:      outputPath,
 					}
 
-					p := r.state.Paths
+					p := r.state.Prefixes
 					if _, err := r.s3s.Run(ctx, p, query, option); err != nil {
 						log.Println(err)
 						return nil
