@@ -112,14 +112,10 @@ func main() {
 				Destination: &state.IsDryRun,
 			},
 			&cli.BoolFlag{
-				Name:        "intteractive",
+				Name:        "interactive",
 				Aliases:     []string{"i"},
+				Usage:       "use as interactive mode",
 				Destination: &config.IsInteractive,
-			},
-			&cli.BoolFlag{
-				Name:    "interactive",
-				Aliases: []string{"i"},
-				Usage:   "use as interactive mode",
 			},
 			&cli.BoolFlag{
 				Name:        "debug",
