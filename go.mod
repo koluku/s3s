@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.38.5
 	github.com/c-bata/go-prompt v0.2.6
 	github.com/dustin/go-humanize v1.0.1
-	github.com/ktr0731/go-fuzzyfinder v0.7.0
+	github.com/ktr0731/go-fuzzyfinder v0.8.0
 	github.com/pkg/errors v0.9.1
 	github.com/urfave/cli/v2 v2.25.7
 	golang.org/x/sync v0.3.0
@@ -37,7 +37,7 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.7 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mattn/go-tty v0.0.3 // indirect
 	github.com/nsf/termbox-go v1.1.1 // indirect
 	github.com/pkg/term v1.2.0-beta.2 // indirect
