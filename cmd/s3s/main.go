@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -34,8 +33,6 @@ var (
 	cliSince cli.Timestamp
 	until    time.Time
 	cliUntil cli.Timestamp
-
-	output string
 
 	// command option
 	isDelve  bool
@@ -119,12 +116,6 @@ func main() {
 				Timezone:    time.UTC,
 				Destination: &cliUntil,
 			},
-			&cli.StringFlag{
-				Category:    "Output:",
-				Name:        "output",
-				Aliases:     []string{"o"},
-				Destination: &output,
-			},
 			&cli.BoolFlag{
 				Category:    "Run:",
 				Name:        "delve",
@@ -204,13 +195,6 @@ func cmd(ctx context.Context, paths []string) error {
 	if queryStr == "" {
 		queryStr = buildQuery(where, limit, isCount, isALBLogs, isCFLogs)
 	}
-	var outputPath string
-	if output != "" {
-		outputPath, err = filepath.Abs(output)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-	}
 
 	var query *s3s.Query
 	switch {
@@ -252,7 +236,6 @@ func cmd(ctx context.Context, paths []string) error {
 	option := &s3s.Option{
 		IsDryRun:    isDryRun,
 		IsCountMode: isCount,
-		Output:      outputPath,
 	}
 
 	result, err := app.Run(ctx, paths, query, option)
