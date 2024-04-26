@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -37,7 +36,6 @@ type Query struct {
 type Option struct {
 	IsDryRun    bool
 	IsCountMode bool
-	Output      string
 }
 
 type Client struct {
@@ -117,7 +115,7 @@ func (c *Client) Run(ctx context.Context, prefixes []string, query *Query, optio
 
 	if !option.IsDryRun {
 		eg.Go(func() error {
-			if err := c.writeOutput(egctx, jsonCH, option); err != nil {
+			if err := c.writeOutput(egctx, jsonCH); err != nil {
 				return errors.WithStack(err)
 			}
 			return nil
@@ -209,17 +207,7 @@ LOOP:
 	return nil
 }
 
-func (c *Client) writeOutput(ctx context.Context, out <-chan []byte, option *Option) error {
-	var file *os.File
-	if option.Output != "" {
-		f, err := os.OpenFile(option.Output, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		file = f
-		defer file.Close()
-	}
-
+func (c *Client) writeOutput(ctx context.Context, out <-chan []byte) error {
 	for {
 		select {
 		case json, ok := <-out:
@@ -228,12 +216,6 @@ func (c *Client) writeOutput(ctx context.Context, out <-chan []byte, option *Opt
 			}
 
 			fmt.Println(string(json))
-
-			if file != nil {
-				if _, err := file.WriteString(string(json) + "\n"); err != nil {
-					return errors.WithStack(err)
-				}
-			}
 		case <-ctx.Done():
 			return nil
 		}
