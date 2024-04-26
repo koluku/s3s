@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.5.4](https://github.com/koluku/s3s/compare/v0.5.3...v0.5.4) - 2024-04-26
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.38.0 to 1.38.5 by @dependabot in https://github.com/koluku/s3s/pull/145
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.33 to 1.18.37 by @dependabot in https://github.com/koluku/s3s/pull/148
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.37 to 1.18.38 by @dependabot in https://github.com/koluku/s3s/pull/149
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.38 to 1.18.39 by @dependabot in https://github.com/koluku/s3s/pull/150
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.39 to 1.18.40 by @dependabot in https://github.com/koluku/s3s/pull/151
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.40 to 1.18.42 by @dependabot in https://github.com/koluku/s3s/pull/152
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2/config from 1.18.42 to 1.18.43 by @dependabot in https://github.com/koluku/s3s/pull/155
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2 from 1.21.0 to 1.21.1 by @dependabot in https://github.com/koluku/s3s/pull/157
+- (auto merged) Bump github.com/aws/aws-sdk-go-v2 from 1.21.1 to 1.21.2 by @dependabot in https://github.com/koluku/s3s/pull/160
+- remove: interactive mode option by @koluku in https://github.com/koluku/s3s/pull/195
+- remove: output option by @koluku in https://github.com/koluku/s3s/pull/197
+
 ## [v0.5.3](https://github.com/koluku/s3s/compare/v0.5.2...v0.5.3) - 2023-08-17
 - Fix format type selection bug, always json by @mashiike in https://github.com/koluku/s3s/pull/143
 
